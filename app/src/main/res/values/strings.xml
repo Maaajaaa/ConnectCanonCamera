@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Connect Canon Camera</string>
+    <string name="tab_text_1">Browse Images</string>
+    <string name="tab_text_2">Remote Camera Operation</string>
+</resources>
