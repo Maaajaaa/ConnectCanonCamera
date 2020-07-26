@@ -42,8 +42,8 @@ class PlaceholderFragment : Fragment() {
         })
         val button: Button = root.findViewById(R.id.button)
 
-        //old UPnP
-        /*net.mm2d.log.Logger.setLogLevel(VERBOSE)
+        //UPnP
+        net.mm2d.log.Logger.setLogLevel(VERBOSE)
         val cp = ControlPointFactory.create(
             //protocol = Protocol.IP_V4_ONLY
         ).also {
@@ -53,7 +53,7 @@ class PlaceholderFragment : Fragment() {
         button.setOnClickListener {
             cp.search("urn:schemas-canon-com:service:MobileConnectedCameraService:1")
             cp.search("urn:schemas-canon-com:service:ICPO-SmartPhoneEOSSystemService:1")
-        }*/
+        }
 
         return root
     }

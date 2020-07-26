@@ -27,7 +27,6 @@
         </activity>
 
         <service android:name="org.fourthline.cling.android.AndroidUpnpServiceImpl"/>
-        <service android:name=".MobileDeviceUpnpService"/>
 
     </application>
 </manifest>

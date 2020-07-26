@@ -1,13 +1,11 @@
-package com.github.sparkycola.connectcanoncamera
+package com.github.sparkycola.connectcanoncamera.ui.main
 
 import org.fourthline.cling.binding.annotations.*
-import org.fourthline.cling.model.action.ActionException
-import org.fourthline.cling.model.types.ErrorCode
 
 
 @UpnpService(
-    serviceId = UpnpServiceId(SERVICE_NAME),
-    serviceType = UpnpServiceType(value = SERVICE_NAME, version = 1)
+    serviceId = UpnpServiceId("CameraConnectedMobile"),
+    serviceType = UpnpServiceType(value = "CameraConnectedMobile", version = 1)
 )
 class CameraConnectedMobileService {
     @UpnpStateVariable(defaultValue = "0", sendEvents = false)
@@ -20,6 +18,7 @@ class CameraConnectedMobileService {
     fun setTarget(@UpnpInputArgument(name = "NewTargetValue") newTargetValue: Boolean) {
         target = newTargetValue
         status = newTargetValue
+        println("Switch is: $status")
     }
 
     @UpnpAction(out = [UpnpOutputArgument(name = "RetTargetValue")])
@@ -30,7 +29,7 @@ class CameraConnectedMobileService {
     @UpnpAction(out = [UpnpOutputArgument(name = "ResultStatus")])
     fun getStatus(): Boolean {
         // If you want to pass extra UPnP information on error:
-        throw ActionException(ErrorCode.ACTION_NOT_AUTHORIZED);
+        // throw new ActionException(ErrorCode.ACTION_NOT_AUTHORIZED);
         return status
     }
 }
