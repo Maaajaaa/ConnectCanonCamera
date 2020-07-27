@@ -6,8 +6,8 @@ import org.fourthline.cling.model.types.ErrorCode
 
 
 @UpnpService(
-    serviceId = UpnpServiceId(SERVICE_NAME),
-    serviceType = UpnpServiceType(value = SERVICE_NAME, version = 1)
+    serviceId = UpnpServiceId(namespace = CANON_NAMESPACE, value = CCM_SERVICE_ID),
+    serviceType = UpnpServiceType(namespace = CANON_NAMESPACE,value = CCM_SERVICE, version = 1)
 )
 class CameraConnectedMobileService {
     @UpnpStateVariable(defaultValue = "0", sendEvents = false)

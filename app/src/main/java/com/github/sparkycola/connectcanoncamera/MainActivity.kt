@@ -23,21 +23,26 @@ import org.fourthline.cling.binding.LocalServiceBindingException
 import org.fourthline.cling.binding.annotations.AnnotationLocalServiceBinder
 import org.fourthline.cling.model.DefaultServiceManager
 import org.fourthline.cling.model.ValidationException
-import org.fourthline.cling.model.message.UpnpHeaders
-import org.fourthline.cling.model.message.header.STAllHeader
-import org.fourthline.cling.model.message.header.UDADeviceTypeHeader
-import org.fourthline.cling.model.message.header.UpnpHeader
+import org.fourthline.cling.model.message.header.ServiceTypeHeader
 import org.fourthline.cling.model.meta.*
-import org.fourthline.cling.model.types.DeviceType
-import org.fourthline.cling.model.types.UDADeviceType
-import org.fourthline.cling.model.types.UDAServiceType
-import org.fourthline.cling.model.types.UDN
+import org.fourthline.cling.model.types.*
 import org.fourthline.cling.registry.DefaultRegistryListener
 import org.fourthline.cling.registry.Registry
 import java.util.*
 
-public const val SERVICE_NAME: String = "MobileConnectedCameraService"
-public const val LEGACY_SERVICE_NAME: String = "ICPO-SmartPhoneEOSSystemService"
+//MobileConnectedCamera refers to the camera, a mobile-connected camera
+public const val MCC_SERVICE: String = "MobileConnectedCameraService"
+//CameraConnectedMobile refers to the mobile(phone), a camera-connected mobile
+public const val CCM_SERVICE: String = "CameraConnectedMobileService"
+public const val CCM_SERVICE_ID: String = "CameraConnectedMobile"
+public const val CANON_NAMESPACE: String = "schemas-canon-com"
+public val CCM_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE,CCM_SERVICE, 1)
+public val MCC_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE,MCC_SERVICE, 1)
+//legacy service, probably for older EOS cameras
+public const val ICPO_SERVICE: String = "ICPO-SmartPhoneEOSSystemService"
+//the interval in which the notify and search requests are sent
+//TODO: make this work robustly, ensuring the order (app first or camera first isn't important)
+public const val NOTIFY_INTERVAL: Int = 10
 
 class MainActivity : AppCompatActivity() {
 
@@ -79,9 +84,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             //find camera(s)
-            val headerValue = "urn:schemas-canon-com:service:MobileConnectedCameraService:1"
-            upnpService!!.controlPoint.search(UpnpHeader.newInstance(UpnpHeader.Type.ST,
-                headerValue))
+            upnpService!!.controlPoint.search(ServiceTypeHeader(MCC_SERVICE_TYPE), NOTIFY_INTERVAL)
         }
 
         override fun onServiceDisconnected(className: ComponentName) {
@@ -118,27 +121,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun getCameraConnectService(): LocalService<CameraConnectedMobileService?>? {
         if (upnpService == null) return null
-        var cameraConnectDevice: LocalDevice? = upnpService!!.registry.getLocalDevice(udn, true)
+        var cameraConnectDevice: LocalDevice? = upnpService!!.registry.getLocalDevice(udn,true)
         return if (cameraConnectDevice == null)
                 /*.also { cameraConnectDevice = it }*/
          {
             null
         } else cameraConnectDevice.findService(
-            UDAServiceType(
-                "CameraConnectedMobileService",
-                1
-            )
-        ) as LocalService<CameraConnectedMobileService?>?
+           CCM_SERVICE_TYPE) as LocalService<CameraConnectedMobileService?>?
     }
 
     @Throws(ValidationException::class, LocalServiceBindingException::class)
     protected fun createDevice(): LocalDevice? {
-        val type: DeviceType = UDADeviceType("Basic", 1)
+        val deviceType: DeviceType = UDADeviceType("Basic", 1)
         //Todo: make this non-hardcoded, consider fixing the manufacturer
-        val details = DeviceDetails(
+        val deviceDetails = DeviceDetails(
             "Redmi Note 8",
             ManufacturerDetails("CANON INC.","http://www.canon.com/"),
-            ModelDetails("Android 9/Redmi Note 8")
+            ModelDetails("Android 9/Redmi Note 8", "Canon Mobile Simulator")
         )
         val service = AnnotationLocalServiceBinder().read(CameraConnectedMobileService::class.java)
         service.setManager(
@@ -146,8 +145,8 @@ class MainActivity : AppCompatActivity() {
         )
         return LocalDevice(
             DeviceIdentity(udn),
-            type,
-            details,
+            deviceType,
+            deviceDetails,
             service
         )
     }
