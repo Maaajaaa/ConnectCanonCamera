@@ -9,8 +9,8 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
 import com.github.sparkycola.connectcanoncamera.R
-import com.github.sparkycola.connectcanoncamera.libimink.ActionSet
-import com.github.sparkycola.connectcanoncamera.libimink.KnownAction
+import com.github.sparkycola.connectcanoncamera.libimink.IminkActionSet
+import com.github.sparkycola.connectcanoncamera.libimink.KnownIminkAction
 
 
 /**
@@ -40,9 +40,9 @@ class PlaceholderFragment : Fragment() {
             //textView.text = it
         })
         //just a little test of the library
-        val actionSet: ActionSet = ActionSet(setOf<KnownAction>(
-            KnownAction.GetGPSCaptureTimeList,
-            KnownAction.GetGPSTime))
+        val actionSet: IminkActionSet = IminkActionSet(setOf<KnownIminkAction>(
+            KnownIminkAction.GetGPSCaptureTimeList,
+            KnownIminkAction.GetGPSTime))
         //var hasGPSTime = actionSet.contains(KnownAction.GetGPSTime)
         //var hasSomethingitHasnt = actionSet.contains(KnownAction.GetMovieExtProperty)
         //Log.d(TAG, "actionset: hasGPSTime:$hasGPSTime but GetMovieProperty is $hasSomethingitHasnt")

@@ -1,6 +1,6 @@
 package com.github.sparkycola.connectcanoncamera.libimink
 
-enum class KnownAction(val kind: Kind, val resourceName: String) {
+enum class KnownIminkAction(val kind: Kind, val resourceName: String) {
     //found in G7X's DeviceDescription XML, no additions from Canon's Camera Connect Android app v2.6.30.21
     SetUsecaseStatus(Kind.Set,"UsecaseStatus"),
     GetObjRecvCapability(Kind.Get,"ObjRecvCapability"),

@@ -16,8 +16,6 @@ import android.util.Log
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager.widget.ViewPager
-import com.github.sparkycola.connectcanoncamera.libimink.ActionSet
-import com.github.sparkycola.connectcanoncamera.libimink.KnownAction
 import com.github.sparkycola.connectcanoncamera.ui.main.SectionsPagerAdapter
 import com.google.android.material.tabs.TabLayout
 import org.fourthline.cling.android.AndroidUpnpService

@@ -4,22 +4,23 @@ import android.util.Xml
 import org.xmlpull.v1.XmlSerializer
 import java.io.StringWriter
 
-class ActionSet {
-    private var set: MutableSet<KnownAction> = mutableSetOf()
+class IminkActionSet {
+    private lateinit var set: Set<KnownIminkAction>
 
     constructor(iminkDescriptorXmlString: String) {
         //Todo: Implement this
     }
 
-    constructor(of: Set<KnownAction>){
-        this.set = of as MutableSet<KnownAction>
+    constructor(of: Set<KnownIminkAction>){
+        this.set = of
     }
 
-    fun contains(element: KnownAction): Boolean{
+    fun contains(element: KnownIminkAction): Boolean{
         return set.contains(element)
     }
 
     //create imink device descriptor string
+    @Throws(IllegalArgumentException::class , IllegalStateException::class)
     fun toIminkDescriptorXMLString(): String? {
         var stringWriter = StringWriter()
         var xmlSerializer: XmlSerializer = Xml.newSerializer()
