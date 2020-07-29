@@ -16,6 +16,8 @@ import android.util.Log
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager.widget.ViewPager
+import com.github.sparkycola.connectcanoncamera.libimink.ActionSet
+import com.github.sparkycola.connectcanoncamera.libimink.KnownAction
 import com.github.sparkycola.connectcanoncamera.ui.main.SectionsPagerAdapter
 import com.google.android.material.tabs.TabLayout
 import org.fourthline.cling.android.AndroidUpnpService
@@ -31,25 +33,25 @@ import org.fourthline.cling.registry.Registry
 import java.util.*
 
 //MobileConnectedCamera refers to the camera, a mobile-connected camera
-public const val MCC_SERVICE: String = "MobileConnectedCameraService"
+const val MCC_SERVICE: String = "MobileConnectedCameraService"
 //CameraConnectedMobile refers to the mobile(phone), a camera-connected mobile
-public const val CCM_SERVICE: String = "CameraConnectedMobileService"
-public const val CCM_SERVICE_ID: String = "CameraConnectedMobile"
-public const val CANON_NAMESPACE: String = "schemas-canon-com"
-public val CCM_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE,CCM_SERVICE, 1)
-public val MCC_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE,MCC_SERVICE, 1)
+const val CCM_SERVICE: String = "CameraConnectedMobileService"
+const val CCM_SERVICE_ID: String = "CameraConnectedMobile"
+const val CANON_NAMESPACE: String = "schemas-canon-com"
+val CCM_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE,CCM_SERVICE, 1)
+val MCC_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE,MCC_SERVICE, 1)
 //legacy service, probably for older EOS cameras
-public const val ICPO_SERVICE: String = "ICPO-SmartPhoneEOSSystemService"
+const val ICPO_SERVICE: String = "ICPO-SmartPhoneEOSSystemService"
 //the interval in which the notify and search requests are sent
 //TODO: make this work robustly, ensuring the order (app first or camera first isn't important)
-public const val NOTIFY_INTERVAL: Int = 10
+const val NOTIFY_INTERVAL: Int = 10
 
 class MainActivity : AppCompatActivity() {
 
     private var upnpService: AndroidUpnpService? = null
     // TODO: Generate and store
     private val udn: UDN = UDN(UUID.fromString("2188B849-F71E-4B2D-AAF3-EE57761A9975"))
-    private val tag = "MainActivity"
+    private val TAG = "MainActivity"
     private val cameraRegistryListener: CameraRegistryListener = CameraRegistryListener()
 
 
@@ -58,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
 
             upnpService = service as AndroidUpnpService
-            var cameraConnectService: LocalService<CameraConnectedMobileService?>? = getCameraConnectService()
+            var cameraConnectService = getCameraConnectService()
 
             // Get ready for future device advertisements
             upnpService!!.registry.addListener(cameraRegistryListener)
@@ -74,11 +76,11 @@ class MainActivity : AppCompatActivity() {
             if (cameraConnectService == null) {
                 try {
                     val cameraConnectDevice: LocalDevice? = createDevice()
-                    Log.v(tag,"Registering CameraConnectDevice")
+                    Log.v(TAG,"Registering CameraConnectDevice")
                     upnpService!!.registry.addDevice(cameraConnectDevice)
                     cameraConnectService = getCameraConnectService()
                 } catch (ex: Exception) {
-                    Log.w(tag,"Creating CameraConnectDevice device failed $ex")
+                    Log.w(TAG,"Creating CameraConnectDevice device failed $ex")
                     return
                 }
             }
@@ -108,6 +110,8 @@ class MainActivity : AppCompatActivity() {
             Context.BIND_AUTO_CREATE
         )
 
+
+
     }
 
     override fun onDestroy() {
@@ -121,9 +125,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun getCameraConnectService(): LocalService<CameraConnectedMobileService?>? {
         if (upnpService == null) return null
-        var cameraConnectDevice: LocalDevice? = upnpService!!.registry.getLocalDevice(udn,true)
+        val cameraConnectDevice: LocalDevice? = upnpService!!.registry.getLocalDevice(udn,true)
         return if (cameraConnectDevice == null)
-                /*.also { cameraConnectDevice = it }*/
          {
             null
         } else cameraConnectDevice.findService(
@@ -167,24 +170,24 @@ class MainActivity : AppCompatActivity() {
         /* End of optimization, you can remove the whole block if your Android handset is fast (>= 600 Mhz) */
 
         override fun remoteDeviceAdded(registry: Registry?, device: RemoteDevice?) {
-            Log.v("CameraRegistyListener", "Device added:  ${device?.getDetails()?.friendlyName}")
+            Log.v("CameraRegistyListener", "Device added:  ${device?.details?.friendlyName}")
         }
 
         override fun remoteDeviceRemoved(registry: Registry?, device: RemoteDevice?) {
-            Log.v("CameraRegistyListener", "Device REMOVED:  ${device?.getDetails()?.friendlyName}")
+            Log.v("CameraRegistyListener", "Device REMOVED:  ${device?.details?.friendlyName}")
         }
 
         override fun localDeviceAdded(registry: Registry?, device: LocalDevice?) {
-            Log.v("CameraRegistyListener", "local device added: ${device?.getDetails()?.friendlyName}")
+            Log.v("CameraRegistyListener", "local device added: ${device?.details?.friendlyName}")
 
         }
 
         override fun localDeviceRemoved(registry: Registry?, device: LocalDevice?) {
-            Log.v("CameraRegistyListener", "local device REMOVED: ${device?.getDetails()?.friendlyName}")
+            Log.v("CameraRegistyListener", "local device REMOVED: ${device?.details?.friendlyName}")
         }
 
         fun deviceAdded(device: Device<DeviceIdentity, Device<*, *, *>, Service<*, *>>?) {
-            Log.v("CameraRegistyListener", "already connected device added:  ${device?.getDetails()?.friendlyName}")
+            Log.v("CameraRegistyListener", "already connected device added:  ${device?.details?.friendlyName}")
         }
     }
 }

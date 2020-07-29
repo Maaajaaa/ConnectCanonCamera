@@ -1,6 +1,7 @@
 package com.github.sparkycola.connectcanoncamera.ui.main
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,8 +11,8 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
 import com.github.sparkycola.connectcanoncamera.R
-import net.mm2d.log.Logger.VERBOSE
-import net.mm2d.upnp.ControlPointFactory
+import com.github.sparkycola.connectcanoncamera.libimink.ActionSet
+import com.github.sparkycola.connectcanoncamera.libimink.KnownAction
 
 
 /**
@@ -38,23 +39,16 @@ class PlaceholderFragment : Fragment() {
         val root = inflater.inflate(R.layout.fragment_main, container, false)
         val textView: TextView = root.findViewById(R.id.section_label)
         pageViewModel.text.observe(this, Observer<String> {
-            textView.text = it
+            //textView.text = it
         })
-        val button: Button = root.findViewById(R.id.button)
-
-        //old UPnP
-        /*net.mm2d.log.Logger.setLogLevel(VERBOSE)
-        val cp = ControlPointFactory.create(
-            //protocol = Protocol.IP_V4_ONLY
-        ).also {
-            it.initialize()
-            it.start()
-        }
-        button.setOnClickListener {
-            cp.search("urn:schemas-canon-com:service:MobileConnectedCameraService:1")
-            cp.search("urn:schemas-canon-com:service:ICPO-SmartPhoneEOSSystemService:1")
-        }*/
-
+        //just a little test of the library
+        val actionSet: ActionSet = ActionSet(setOf<KnownAction>(
+            KnownAction.GetGPSCaptureTimeList,
+            KnownAction.GetGPSTime))
+        //var hasGPSTime = actionSet.contains(KnownAction.GetGPSTime)
+        //var hasSomethingitHasnt = actionSet.contains(KnownAction.GetMovieExtProperty)
+        //Log.d(TAG, "actionset: hasGPSTime:$hasGPSTime but GetMovieProperty is $hasSomethingitHasnt")
+        textView.text = actionSet.toXMLString()
         return root
     }
 

@@ -1,7 +1,6 @@
 package com.github.sparkycola.connectcanoncamera
 
 import android.util.Log
-import net.mm2d.upnp.util.forEach
 import org.fourthline.cling.binding.xml.Descriptor
 import org.fourthline.cling.binding.xml.DescriptorBindingException
 import org.fourthline.cling.binding.xml.UDA10DeviceDescriptorBinderImpl
@@ -28,8 +27,8 @@ class CanonDeviceDescriptorBinderImpl: UDA10DeviceDescriptorBinderImpl() {
         info: RemoteClientInfo?,
         namespace: Namespace?
     ): String {
-        var orignalXMLString = super.generate(deviceModel, info, namespace)
-        var XMLWithImink = orignalXMLString.replace("</service>","<ns:X_SCPDURL xmlns:ns=\"urn:schemas-canon-com:schema-imink\">desc_iml/CameraConnectedMobile.xml</ns:X_SCPDURL> \n" +
+        val orignalXMLString = super.generate(deviceModel, info, namespace)
+        val XMLWithImink = orignalXMLString.replace("</service>","<ns:X_SCPDURL xmlns:ns=\"urn:schemas-canon-com:schema-imink\">desc_iml/CameraConnectedMobile.xml</ns:X_SCPDURL> \n" +
                 "<ns:X_ExtActionVer xmlns:ns=\"urn:schemas-canon-com:schema-imink\">1.0</ns:X_ExtActionVer> \n" +
                 "<ns:X_VendorExtVer xmlns:ns=\"urn:schemas-canon-com:schema-imink\">1-1502.0.0.0</ns:X_VendorExtVer></service>")
         return XMLWithImink
@@ -49,7 +48,7 @@ class CanonDeviceDescriptorBinderImpl: UDA10DeviceDescriptorBinderImpl() {
 
         //UDA 1.1 spec says: Don't use URLBase anymore BUT Canon uses UDA1.0!!
         //if (deviceModel.getBaseURL() != null) {
-            appendNewElementIfNotNull(descriptor, rootElement, "URLBase", "http://10.42.0.129:49152/");
+            appendNewElementIfNotNull(descriptor, rootElement, "URLBase", "http://10.42.0.129:49152/")
         //}
         generateDevice(namespace, deviceModel, descriptor, rootElement, info)
     }
