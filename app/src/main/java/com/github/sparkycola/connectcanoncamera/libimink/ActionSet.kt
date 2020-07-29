@@ -1,14 +1,13 @@
 package com.github.sparkycola.connectcanoncamera.libimink
 
 import android.util.Xml
-import org.fourthline.cling.model.XMLUtil
 import org.xmlpull.v1.XmlSerializer
 import java.io.StringWriter
 
 class ActionSet {
     private var set: MutableSet<KnownAction> = mutableSetOf()
 
-    constructor(xmlString: String) {
+    constructor(iminkDescriptorXmlString: String) {
         //Todo: Implement this
     }
 
@@ -20,8 +19,8 @@ class ActionSet {
         return set.contains(element)
     }
 
-    fun toXMLString(): String? {
-
+    //create imink device descriptor string
+    fun toIminkDescriptorXMLString(): String? {
         var stringWriter = StringWriter()
         var xmlSerializer: XmlSerializer = Xml.newSerializer()
         val ns_imink = "urn:schemas-canon-com:schema-imink"
@@ -29,10 +28,8 @@ class ActionSet {
         //<?xml tag
         xmlSerializer.setOutput(stringWriter)
         xmlSerializer.startDocument("UTF-8",true)
-        //xmlSerializer.attribute("","version","1.0")
         //<scpd
         xmlSerializer.startTag(ns_upnp,"scpd")
-        //xmlSerializer.attribute("","xmlns",ns_upnp)
         //<specVersion
         xmlSerializer.startTag("","specVersion")
         xmlSerializer.startTag("","major")
@@ -62,6 +59,5 @@ class ActionSet {
         xmlSerializer.endTag(ns_upnp,"scpd")
         xmlSerializer.endDocument()
         return stringWriter.toString()
-
     }
 }
