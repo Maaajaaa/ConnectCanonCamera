@@ -7,13 +7,12 @@ import org.fourthline.cling.binding.xml.DeviceDescriptorBinder
 import org.fourthline.cling.binding.xml.ServiceDescriptorBinder
 import org.fourthline.cling.binding.xml.UDA10ServiceDescriptorBinderImpl
 
-
-class MobileDeviceUpnpService : AndroidUpnpServiceImpl() {
+class MobileDeviceUpnpServiceImpl : AndroidUpnpServiceImpl() {
     override fun createConfiguration(): UpnpServiceConfiguration {
         return object : AndroidUpnpServiceConfiguration() {
 
             override fun getRegistryMaintenanceIntervalMillis(): Int {
-                return 7000
+                return NOTIFY_INTERVAL * 1000
             }
 
             //only search for CanonCameras
@@ -24,14 +23,16 @@ class MobileDeviceUpnpService : AndroidUpnpServiceImpl() {
             }*/
 
             override fun getDeviceDescriptorBinderUDA10(): DeviceDescriptorBinder? {
-                // Recommended for best interoperability with broken UPnP stacks!
                 return CanonDeviceDescriptorBinderImpl()
             }
+
             override fun getServiceDescriptorBinderUDA10(): ServiceDescriptorBinder? {
                 return UDA10ServiceDescriptorBinderImpl()
             }
 
-
+            override fun getAliveIntervalMillis(): Int {
+                return NOTIFY_INTERVAL * 1000
+            }
         }
     }
 

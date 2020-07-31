@@ -1,14 +1,45 @@
 package com.github.sparkycola.connectcanoncamera.libimink
 
+import android.util.Log
 import android.util.Xml
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserException
 import org.xmlpull.v1.XmlSerializer
+import java.io.IOException
+import java.io.InputStream
+import java.io.StringReader
 import java.io.StringWriter
 
 class IminkActionSet {
-    private lateinit var set: Set<KnownIminkAction>
+    private var set: Set<KnownIminkAction>
 
+    //namespace constants
+    //Todo make those nicer and project-wide
+    private val nsImink = "urn:schemas-canon-com:schema-imink"
+    private val nsUpnp = "urn:schemas-upnp-org:service-1-0"
+
+    @Throws(XmlPullParserException::class, IOException::class)
     constructor(iminkDescriptorXmlString: String) {
-        //Todo: Implement this
+        val supportedActions = mutableSetOf<KnownIminkAction>()
+        val parser: XmlPullParser = Xml.newPullParser()
+        parser.setInput(StringReader(iminkDescriptorXmlString))
+        while (parser.next() != XmlPullParser.END_DOCUMENT){
+            if (parser.eventType != XmlPullParser.START_TAG) {
+                continue
+            }
+            //look for the action names in the list and ignore everything else
+            if (parser.name == "action") {
+                while(!(parser.next() == XmlPullParser.END_TAG && parser.name == "action")){
+                    if (parser.name == "name" && parser.eventType == XmlPullParser.START_TAG){
+                        parser.next()
+                        if(parser.text != null){
+                            KnownIminkAction.valueOf(parser.text)?.let{supportedActions.add(it)}
+                        }
+                    }
+                }
+            }
+        }
+        this.set = supportedActions
     }
 
     constructor(of: Set<KnownIminkAction>){
@@ -22,15 +53,13 @@ class IminkActionSet {
     //create imink device descriptor string
     @Throws(IllegalArgumentException::class , IllegalStateException::class)
     fun toIminkDescriptorXMLString(): String? {
-        var stringWriter = StringWriter()
-        var xmlSerializer: XmlSerializer = Xml.newSerializer()
-        val ns_imink = "urn:schemas-canon-com:schema-imink"
-        val ns_upnp = "urn:schemas-upnp-org:service-1-0"
+        val stringWriter = StringWriter()
+        val xmlSerializer: XmlSerializer = Xml.newSerializer()
         //<?xml tag
         xmlSerializer.setOutput(stringWriter)
         xmlSerializer.startDocument("UTF-8",true)
         //<scpd
-        xmlSerializer.startTag(ns_upnp,"scpd")
+        xmlSerializer.startTag(nsUpnp,"scpd")
         //<specVersion
         xmlSerializer.startTag("","specVersion")
         xmlSerializer.startTag("","major")
@@ -41,23 +70,23 @@ class IminkActionSet {
         xmlSerializer.endTag("","minor")
         xmlSerializer.endTag("","specVersion")
         //<actionList
-        xmlSerializer.startTag(ns_imink,"actionList")
+        xmlSerializer.startTag(nsImink,"actionList")
         set.forEach {
-            xmlSerializer.startTag(ns_imink,"action")
+            xmlSerializer.startTag(nsImink,"action")
             xmlSerializer.startTag("","name")
             xmlSerializer.text(it.name)
             xmlSerializer.endTag("","name")
-            xmlSerializer.startTag(ns_imink,"X_actKind")
+            xmlSerializer.startTag(nsImink,"X_actKind")
             xmlSerializer.text(it.kind.name)
-            xmlSerializer.endTag(ns_imink,"X_actKind")
-            xmlSerializer.startTag(ns_imink,"X_resourceName")
+            xmlSerializer.endTag(nsImink,"X_actKind")
+            xmlSerializer.startTag(nsImink,"X_resourceName")
             xmlSerializer.text(it.resourceName)
-            xmlSerializer.endTag(ns_imink,"X_resourceName")
-            xmlSerializer.endTag(ns_imink,"action")
+            xmlSerializer.endTag(nsImink,"X_resourceName")
+            xmlSerializer.endTag(nsImink,"action")
         }
-        xmlSerializer.endTag(ns_imink,"actionList")
+        xmlSerializer.endTag(nsImink,"actionList")
         //end <scpd and document
-        xmlSerializer.endTag(ns_upnp,"scpd")
+        xmlSerializer.endTag(nsUpnp,"scpd")
         xmlSerializer.endDocument()
         return stringWriter.toString()
     }

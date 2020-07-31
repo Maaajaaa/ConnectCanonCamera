@@ -32,21 +32,25 @@ import java.util.*
 
 //MobileConnectedCamera refers to the camera, a mobile-connected camera
 const val MCC_SERVICE: String = "MobileConnectedCameraService"
+
 //CameraConnectedMobile refers to the mobile(phone), a camera-connected mobile
 const val CCM_SERVICE: String = "CameraConnectedMobileService"
 const val CCM_SERVICE_ID: String = "CameraConnectedMobile"
 const val CANON_NAMESPACE: String = "schemas-canon-com"
-val CCM_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE,CCM_SERVICE, 1)
-val MCC_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE,MCC_SERVICE, 1)
+val CCM_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, CCM_SERVICE, 1)
+val MCC_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, MCC_SERVICE, 1)
+
 //legacy service, probably for older EOS cameras
 const val ICPO_SERVICE: String = "ICPO-SmartPhoneEOSSystemService"
+
 //the interval in which the notify and search requests are sent
-//TODO: make this work robustly, ensuring the order (app first or camera first isn't important)
 const val NOTIFY_INTERVAL: Int = 10
+var hostPort: Int = 0
 
 class MainActivity : AppCompatActivity() {
 
     private var upnpService: AndroidUpnpService? = null
+
     // TODO: Generate and store
     private val udn: UDN = UDN(UUID.fromString("2188B849-F71E-4B2D-AAF3-EE57761A9975"))
     private val TAG = "MainActivity"
@@ -74,15 +78,20 @@ class MainActivity : AppCompatActivity() {
             if (cameraConnectService == null) {
                 try {
                     val cameraConnectDevice: LocalDevice? = createDevice()
-                    Log.v(TAG,"Registering CameraConnectDevice")
+                    Log.v(TAG, "Registering CameraConnectDevice")
                     upnpService!!.registry.addDevice(cameraConnectDevice)
                     cameraConnectService = getCameraConnectService()
                 } catch (ex: Exception) {
-                    Log.w(TAG,"Creating CameraConnectDevice device failed $ex")
+                    Log.w(TAG, "Creating CameraConnectDevice device failed $ex")
                     return
                 }
             }
 
+            val activeStreamServers = upnpService!!.get().router.getActiveStreamServers(null)
+            for (streamServer in activeStreamServers) {
+                Log.d(TAG, "stream server at: ${streamServer.address}:${streamServer.port}")
+                hostPort = streamServer.port
+            }
             //find camera(s)
             upnpService!!.controlPoint.search(ServiceTypeHeader(MCC_SERVICE_TYPE), NOTIFY_INTERVAL)
         }
@@ -91,6 +100,7 @@ class MainActivity : AppCompatActivity() {
             upnpService = null
         }
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -103,11 +113,10 @@ class MainActivity : AppCompatActivity() {
 
         //bind upnp service
         applicationContext.bindService(
-            Intent(this, MobileDeviceUpnpService::class.java),
+            Intent(this, MobileDeviceUpnpServiceImpl::class.java),
             serviceConnection,
             Context.BIND_AUTO_CREATE
         )
-
 
 
     }
@@ -123,12 +132,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun getCameraConnectService(): LocalService<CameraConnectedMobileService?>? {
         if (upnpService == null) return null
-        val cameraConnectDevice: LocalDevice? = upnpService!!.registry.getLocalDevice(udn,true)
-        return if (cameraConnectDevice == null)
-         {
+        val cameraConnectDevice: LocalDevice? = upnpService!!.registry.getLocalDevice(udn, true)
+        return if (cameraConnectDevice == null) {
             null
         } else cameraConnectDevice.findService(
-           CCM_SERVICE_TYPE) as LocalService<CameraConnectedMobileService?>?
+            CCM_SERVICE_TYPE
+        ) as LocalService<CameraConnectedMobileService?>?
     }
 
     @Throws(ValidationException::class, LocalServiceBindingException::class)
@@ -137,12 +146,15 @@ class MainActivity : AppCompatActivity() {
         //Todo: make this non-hardcoded, consider fixing the manufacturer
         val deviceDetails = DeviceDetails(
             "Redmi Note 8",
-            ManufacturerDetails("CANON INC.","http://www.canon.com/"),
+            ManufacturerDetails("CANON INC.", "http://www.canon.com/"),
             ModelDetails("Android 9/Redmi Note 8", "Canon Mobile Simulator")
         )
         val service = AnnotationLocalServiceBinder().read(CameraConnectedMobileService::class.java)
         service.setManager(
-            DefaultServiceManager<CameraConnectedMobileService>(service as LocalService<CameraConnectedMobileService>?, CameraConnectedMobileService::class.java)
+            DefaultServiceManager<CameraConnectedMobileService>(
+                service as LocalService<CameraConnectedMobileService>?,
+                CameraConnectedMobileService::class.java
+            )
         )
         return LocalDevice(
             DeviceIdentity(udn),
@@ -151,6 +163,7 @@ class MainActivity : AppCompatActivity() {
             service
         )
     }
+
     class CameraRegistryListener : DefaultRegistryListener() {
         /* Discovery performance optimization for very slow Android devices! */
         override fun remoteDeviceDiscoveryStarted(registry: Registry?, device: RemoteDevice?) {
@@ -162,17 +175,34 @@ class MainActivity : AppCompatActivity() {
             device: RemoteDevice,
             ex: Exception?
         ) {
-            Log.e("CameraRegistryListener","(slow mode) Discovery failed of '" + device.displayString + "': "
-                    + (ex?.toString() ?: "Couldn't retrieve device/service descriptors"))
+            Log.e(
+                "CameraRegistryListener",
+                "(slow mode) Discovery failed of '" + device.displayString + "': "
+                        + (ex?.toString() ?: "Couldn't retrieve device/service descriptors")
+            )
         }
         /* End of optimization, you can remove the whole block if your Android handset is fast (>= 600 Mhz) */
 
         override fun remoteDeviceAdded(registry: Registry?, device: RemoteDevice?) {
+
+
             Log.v("CameraRegistyListener", "Device added:  ${device?.details?.friendlyName}")
+            Log.v("CaemraRegistryListener", "URL: ${device?.identity?.descriptorURL}")
+            Log.v("CaemraRegistryListener", "udn : ${device?.identity?.udn}")
+
+            /*Log.v("CaemraRegistryListener", "number of services : ${device?.services!!.size}")
+            Log.v("CaemraRegistryListener", "descriptorURI : ${device?.services!![0].descriptorURI}")
+            Log.v("CaemraRegistryListener", "controlURI : ${device?.services!![0].controlURI}")
+            Log.v("CaemraRegistryListener", "controlURI : ${device?.services!![0].eventSubscriptionURI}")
+            Log.v("CaemraRegistryListener", "nb of actions : ${device?.services!![0].actions.size}")
+            Log.v("CaemraRegistryListener", "nb of state vars : ${device?.services!![0].stateVariables!![0].name}")
+            Log.v("CaemraRegistryListener", "nb of state vars : ${device?.services!![0].stateVariables!![0].typeDetails}")
+            Log.v("CaemraRegistryListener", "nb of state vars : ${device?.services!![0].stateVariables!![0]}")*/
         }
 
         override fun remoteDeviceRemoved(registry: Registry?, device: RemoteDevice?) {
             Log.v("CameraRegistyListener", "Device REMOVED:  ${device?.details?.friendlyName}")
+
         }
 
         override fun localDeviceAdded(registry: Registry?, device: LocalDevice?) {
@@ -185,7 +215,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         fun deviceAdded(device: Device<DeviceIdentity, Device<*, *, *>, Service<*, *>>?) {
-            Log.v("CameraRegistyListener", "already connected device added:  ${device?.details?.friendlyName}")
+            Log.v(
+                "CameraRegistyListener",
+                "already connected device added:  ${device?.details?.friendlyName}"
+            )
         }
     }
 }
