@@ -4,6 +4,7 @@ import android.util.Log
 import org.fourthline.cling.binding.staging.MutableDevice
 import org.fourthline.cling.binding.staging.MutableService
 import org.fourthline.cling.binding.xml.Descriptor
+import org.fourthline.cling.binding.xml.Descriptor.Device.ELEMENT
 import org.fourthline.cling.binding.xml.DescriptorBindingException
 import org.fourthline.cling.binding.xml.UDA10DeviceDescriptorBinderImpl
 import org.fourthline.cling.model.Namespace
@@ -11,6 +12,8 @@ import org.fourthline.cling.model.ValidationException
 import org.fourthline.cling.model.XMLUtil
 import org.fourthline.cling.model.XMLUtil.appendNewElementIfNotNull
 import org.fourthline.cling.model.meta.Device
+import org.fourthline.cling.model.meta.LocalService
+import org.fourthline.cling.model.meta.RemoteService
 import org.fourthline.cling.model.meta.Service
 import org.fourthline.cling.model.profile.RemoteClientInfo
 import org.fourthline.cling.model.types.InvalidValueException
@@ -19,9 +22,6 @@ import org.fourthline.cling.model.types.ServiceType
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.Node
-import org.w3c.dom.NodeList
-import java.net.Inet4Address
-import java.net.NetworkInterface
 import java.net.URI
 
 class CanonDeviceDescriptorBinderImpl : UDA10DeviceDescriptorBinderImpl() {
@@ -32,22 +32,6 @@ class CanonDeviceDescriptorBinderImpl : UDA10DeviceDescriptorBinderImpl() {
         ValidationException::class
     )
 
-    override fun generate(
-        deviceModel: Device<*, out Device<*, *, *>, out Service<*, *>>?,
-        info: RemoteClientInfo?,
-        namespace: Namespace?
-    ): String {
-        val orignalXMLString = super.generate(deviceModel, info, namespace)
-        //Todo soft-code this
-        val XMLWithImink = orignalXMLString.replace(
-            "</service>",
-            "<ns:X_SCPDURL xmlns:ns=\"urn:schemas-canon-com:schema-imink\">desc_iml/CameraConnectedMobile.xml</ns:X_SCPDURL>" +
-                    "<ns:X_ExtActionVer xmlns:ns=\"urn:schemas-canon-com:schema-imink\">1.0</ns:X_ExtActionVer>" +
-                    "<ns:X_VendorExtVer xmlns:ns=\"urn:schemas-canon-com:schema-imink\">1-1502.0.0.0</ns:X_VendorExtVer></service>"
-        )
-        return XMLWithImink
-    }
-
     override fun generateRoot(
         namespace: Namespace?,
         deviceModel: Device<*, *, *>?,
@@ -56,7 +40,7 @@ class CanonDeviceDescriptorBinderImpl : UDA10DeviceDescriptorBinderImpl() {
     ) {
         val rootElement = descriptor.createElementNS(
             Descriptor.Device.NAMESPACE_URI,
-            Descriptor.Device.ELEMENT.root.toString()
+            ELEMENT.root.toString()
         )
         descriptor.appendChild(rootElement)
         generateSpecVersion(namespace, deviceModel, descriptor, rootElement)
@@ -67,10 +51,49 @@ class CanonDeviceDescriptorBinderImpl : UDA10DeviceDescriptorBinderImpl() {
             descriptor,
             rootElement,
             "URLBase",
-            "http://${getIpv4HostAddress()}:$hostPort/"
+            "http://$hostAddress:$hostPort/"
         )
         //}
         generateDevice(namespace, deviceModel, descriptor, rootElement, info)
+    }
+
+    override fun generateServiceList(
+        namespace: Namespace,
+        deviceModel: Device<*, *, *>,
+        descriptor: Document?,
+        deviceElement: Element?
+    ) {
+        if (!deviceModel.hasServices()) return
+        val serviceListElement = XMLUtil.appendNewElement(descriptor, deviceElement, ELEMENT.serviceList)
+        for (service in deviceModel.services) {
+
+            val serviceElement = XMLUtil.appendNewElement(descriptor, serviceListElement, ELEMENT.service)
+            appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.serviceType, service.serviceType)
+            appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.serviceId, service.serviceId)
+
+            if (service is RemoteService) {
+                val rs = service
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.SCPDURL, rs.descriptorURI)
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.controlURL, rs.controlURI)
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.eventSubURL, rs.eventSubscriptionURI)
+            } else if (service is LocalService<*>) {
+                val ls = service
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.SCPDURL, namespace.getDescriptorPath(ls))
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.controlURL, namespace.getControlPath(ls))
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.eventSubURL, namespace.getEventSubscriptionPath(ls))
+                //if we're providing the CameraConnectedMobile service we need to provide imink too
+                if (service.serviceType == CCM_SERVICE_TYPE){
+                    Log.d(TAG,"found CCM local service to append the imink tags on")
+                    //append imink tags
+                    appendNewElementIfNotNull(descriptor, serviceElement, "X_SCPDURL",
+                        namespace.getDescriptorPath(ls), IMINK_NAMESPACE)
+                    appendNewElementIfNotNull(descriptor, serviceElement, "X_ExtActionVer",
+                        "1.0", IMINK_NAMESPACE)
+                    appendNewElementIfNotNull(descriptor, serviceElement, "X_VendorExtVer",
+                        "1-1502.0.0.0", IMINK_NAMESPACE)
+                }
+            }
+        }
     }
 
     @Throws(DescriptorBindingException::class)
@@ -82,7 +105,7 @@ class CanonDeviceDescriptorBinderImpl : UDA10DeviceDescriptorBinderImpl() {
         for (i in 0 until serviceListNodeChildren.length) {
             val serviceListNodeChild = serviceListNodeChildren.item(i)
             if (serviceListNodeChild.nodeType != Node.ELEMENT_NODE) continue
-            if (Descriptor.Device.ELEMENT.service.equals(
+            if (ELEMENT.service.equals(
                     serviceListNodeChild
                 )
             ) {
@@ -98,24 +121,24 @@ class CanonDeviceDescriptorBinderImpl : UDA10DeviceDescriptorBinderImpl() {
                         var iminkSCPDURL: URI? = null
                         if (serviceChild.nodeType != Node.ELEMENT_NODE) continue
                         when {
-                            Descriptor.Device.ELEMENT.serviceType.equals(serviceChild) -> {
+                            ELEMENT.serviceType.equals(serviceChild) -> {
                                 service.serviceType =
                                     ServiceType.valueOf(XMLUtil.getTextContent(serviceChild))
                             }
-                            Descriptor.Device.ELEMENT.serviceId.equals(serviceChild) -> {
+                            ELEMENT.serviceId.equals(serviceChild) -> {
                                 service.serviceId = ServiceId.valueOf(
                                     XMLUtil.getTextContent(serviceChild)
                                 )
                             }
-                            Descriptor.Device.ELEMENT.SCPDURL.equals(serviceChild) -> {
+                            ELEMENT.SCPDURL.equals(serviceChild) -> {
                                 service.descriptorURI = parseURI(
                                     XMLUtil.getTextContent(serviceChild)
                                 )
                             }
-                            Descriptor.Device.ELEMENT.controlURL.equals(serviceChild) -> {
+                            ELEMENT.controlURL.equals(serviceChild) -> {
                                 service.controlURI = parseURI(XMLUtil.getTextContent(serviceChild))
                             }
-                            Descriptor.Device.ELEMENT.eventSubURL.equals(serviceChild) -> {
+                            ELEMENT.eventSubURL.equals(serviceChild) -> {
                                 service.eventSubscriptionURI =
                                     parseURI(XMLUtil.getTextContent(serviceChild))
                             }
@@ -147,17 +170,9 @@ class CanonDeviceDescriptorBinderImpl : UDA10DeviceDescriptorBinderImpl() {
     }
 
     override fun hydrateRoot(descriptor: MutableDevice?, rootElement: Element?) {
-        val nodes: NodeList =
-            rootElement?.getElementsByTagName("serviceList")!!.item(0).childNodes.item(1).childNodes
+        //
+        /*val nodes: NodeList =
+            rootElement?.getElementsByTagName("serviceList")!!.item(0).childNodes.item(1).childNodes*/
         super.hydrateRoot(descriptor, rootElement)
-    }
-
-    fun getIpv4HostAddress(): String {
-        NetworkInterface.getNetworkInterfaces()?.toList()?.map { networkInterface ->
-            networkInterface.inetAddresses?.toList()?.find {
-                !it.isLoopbackAddress && it is Inet4Address
-            }?.let { return it.hostAddress }
-        }
-        return ""
     }
 }

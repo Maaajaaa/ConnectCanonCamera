@@ -37,6 +37,7 @@ const val MCC_SERVICE: String = "MobileConnectedCameraService"
 const val CCM_SERVICE: String = "CameraConnectedMobileService"
 const val CCM_SERVICE_ID: String = "CameraConnectedMobile"
 const val CANON_NAMESPACE: String = "schemas-canon-com"
+const val IMINK_NAMESPACE: String = "urn:schemas-canon-com:schema-imink"
 val CCM_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, CCM_SERVICE, 1)
 val MCC_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, MCC_SERVICE, 1)
 
@@ -46,6 +47,7 @@ const val ICPO_SERVICE: String = "ICPO-SmartPhoneEOSSystemService"
 //the interval in which the notify and search requests are sent
 const val NOTIFY_INTERVAL: Int = 10
 var hostPort: Int = 0
+var hostAddress = ""
 
 class MainActivity : AppCompatActivity() {
 
@@ -91,6 +93,7 @@ class MainActivity : AppCompatActivity() {
             for (streamServer in activeStreamServers) {
                 Log.d(TAG, "stream server at: ${streamServer.address}:${streamServer.port}")
                 hostPort = streamServer.port
+                hostAddress = streamServer.address.hostAddress
             }
             //find camera(s)
             upnpService!!.controlPoint.search(ServiceTypeHeader(MCC_SERVICE_TYPE), NOTIFY_INTERVAL)
