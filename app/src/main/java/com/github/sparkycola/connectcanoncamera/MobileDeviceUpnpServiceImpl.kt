@@ -5,7 +5,6 @@ import org.fourthline.cling.android.AndroidUpnpServiceConfiguration
 import org.fourthline.cling.android.AndroidUpnpServiceImpl
 import org.fourthline.cling.binding.xml.DeviceDescriptorBinder
 import org.fourthline.cling.binding.xml.ServiceDescriptorBinder
-import org.fourthline.cling.binding.xml.UDA10ServiceDescriptorBinderImpl
 
 class MobileDeviceUpnpServiceImpl : AndroidUpnpServiceImpl() {
     override fun createConfiguration(): UpnpServiceConfiguration {
@@ -27,7 +26,7 @@ class MobileDeviceUpnpServiceImpl : AndroidUpnpServiceImpl() {
             }
 
             override fun getServiceDescriptorBinderUDA10(): ServiceDescriptorBinder? {
-                return UDA10ServiceDescriptorBinderImpl()
+                return IminkServiceDescriptionBinderImpl()
             }
 
             override fun getAliveIntervalMillis(): Int {

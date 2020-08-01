@@ -14,7 +14,6 @@ import org.fourthline.cling.model.XMLUtil.appendNewElementIfNotNull
 import org.fourthline.cling.model.meta.Device
 import org.fourthline.cling.model.meta.LocalService
 import org.fourthline.cling.model.meta.RemoteService
-import org.fourthline.cling.model.meta.Service
 import org.fourthline.cling.model.profile.RemoteClientInfo
 import org.fourthline.cling.model.types.InvalidValueException
 import org.fourthline.cling.model.types.ServiceId
@@ -72,21 +71,25 @@ class CanonDeviceDescriptorBinderImpl : UDA10DeviceDescriptorBinderImpl() {
             appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.serviceId, service.serviceId)
 
             if (service is RemoteService) {
-                val rs = service
-                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.SCPDURL, rs.descriptorURI)
-                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.controlURL, rs.controlURI)
-                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.eventSubURL, rs.eventSubscriptionURI)
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.SCPDURL, service.descriptorURI)
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.controlURL, service.controlURI)
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.eventSubURL, service.eventSubscriptionURI)
             } else if (service is LocalService<*>) {
-                val ls = service
-                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.SCPDURL, namespace.getDescriptorPath(ls))
-                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.controlURL, namespace.getControlPath(ls))
-                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.eventSubURL, namespace.getEventSubscriptionPath(ls))
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.SCPDURL, namespace.getDescriptorPath(
+                    service
+                ))
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.controlURL, namespace.getControlPath(
+                    service
+                ))
+                appendNewElementIfNotNull(descriptor, serviceElement, ELEMENT.eventSubURL, namespace.getEventSubscriptionPath(
+                    service
+                ))
                 //if we're providing the CameraConnectedMobile service we need to provide imink too
                 if (service.serviceType == CCM_SERVICE_TYPE){
                     Log.d(TAG,"found CCM local service to append the imink tags on")
                     //append imink tags
                     appendNewElementIfNotNull(descriptor, serviceElement, "X_SCPDURL",
-                        namespace.getDescriptorPath(ls), IMINK_NAMESPACE)
+                        namespace.getDescriptorPath(service), IMINK_NAMESPACE)
                     appendNewElementIfNotNull(descriptor, serviceElement, "X_ExtActionVer",
                         "1.0", IMINK_NAMESPACE)
                     appendNewElementIfNotNull(descriptor, serviceElement, "X_VendorExtVer",
