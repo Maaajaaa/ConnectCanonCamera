@@ -13,13 +13,13 @@ import org.w3c.dom.Element
 import java.util.*
 import javax.xml.parsers.DocumentBuilderFactory
 
-class IminkServiceDescriptionBinderImpl: UDA10ServiceDescriptorBinderImpl() {
+class IminkServiceDescriptionBinderImpl : UDA10ServiceDescriptorBinderImpl() {
     private val TAG = "IminkSrvcDescBindImpl"
 
     @Throws(DescriptorBindingException::class)
     override fun buildDOM(service: Service<*, *>): Document? {
         return try {
-            Log.d(TAG,"Generating XML descriptor from service model: $service")
+            Log.d(TAG, "Generating XML descriptor from service model: $service")
             val factory =
                 DocumentBuilderFactory.newInstance()
             factory.isNamespaceAware = true
@@ -49,7 +49,13 @@ class IminkServiceDescriptionBinderImpl: UDA10ServiceDescriptorBinderImpl() {
         if (serviceModel.hasActions()) {
             generateActionList(serviceModel, descriptor, scpdElement)
         }
-        generateServiceStateTable(serviceModel, descriptor, scpdElement)
+        //IMINK config does not contain the serviceStateTable, so I'm skipping it
+        if (serviceModel.serviceType == CCM_SERVICE_TYPE) {
+            Log.d(TAG, "Cannon connect service found, skipping service table generation")
+        } else {
+            generateServiceStateTable(serviceModel, descriptor, scpdElement)
+        }
+        //Log.d(TAG," ${XMLUtil.documentToString(descriptor)}")
     }
 
     private fun generateSpecVersion(
@@ -88,6 +94,7 @@ class IminkServiceDescriptionBinderImpl: UDA10ServiceDescriptorBinderImpl() {
         )
         for (action in serviceModel.actions) {
             if (action.name != QueryStateVariableAction.ACTION_NAME) generateAction(
+                serviceModel,
                 action,
                 descriptor,
                 actionListElement
@@ -96,6 +103,7 @@ class IminkServiceDescriptionBinderImpl: UDA10ServiceDescriptorBinderImpl() {
     }
 
     private fun generateAction(
+        serviceModel: Service<*, *>,
         action: Action<*>,
         descriptor: Document,
         actionListElement: Element
@@ -112,13 +120,41 @@ class IminkServiceDescriptionBinderImpl: UDA10ServiceDescriptorBinderImpl() {
             action.name
         )
         if (action.hasArguments()) {
-            val argumentListElement = XMLUtil.appendNewElement(
-                descriptor,
-                actionElement,
-                Descriptor.Service.ELEMENT.argumentList
-            )
-            for (actionArgument in action.arguments) {
-                generateActionArgument(actionArgument, descriptor, argumentListElement)
+            if (serviceModel.serviceType == CCM_SERVICE_TYPE) {
+                Log.d(
+                    TAG,
+                    "Cannon connect service found, generating alternative (imink) argument list"
+                )
+                var actType = ""
+                when (action.arguments[0]?.direction.toString().toLowerCase(Locale.ROOT)) {
+                    "out" -> actType = "Get"
+                    "in" -> actType = "Set"
+                }
+                XMLUtil.appendNewElementIfNotNull(
+                    descriptor,
+                    actionElement,
+                    "X_actKind",
+                    actType,
+                    IMINK_NAMESPACE
+                ).prefix = "ns"
+                XMLUtil.appendNewElementIfNotNull(
+                    descriptor,
+                    actionElement,
+                    "X_resourceName",
+                    action.arguments[0]?.relatedStateVariableName,
+                    IMINK_NAMESPACE
+                ).prefix = "ns"
+
+
+            } else {
+                val argumentListElement = XMLUtil.appendNewElement(
+                    descriptor,
+                    actionElement,
+                    Descriptor.Service.ELEMENT.argumentList
+                )
+                for (actionArgument in action.arguments) {
+                    generateActionArgument(actionArgument, descriptor, argumentListElement)
+                }
             }
         }
     }
@@ -147,7 +183,10 @@ class IminkServiceDescriptionBinderImpl: UDA10ServiceDescriptorBinderImpl() {
         )
         if (actionArgument.isReturnValue) {
             // TODO: UPNP VIOLATION: WMP12 will discard RenderingControl service if it contains <retval> tags
-            Log.w(TAG,"UPnP specification violation: Not producing <retval> element to be compatible with WMP12: $actionArgument")
+            Log.w(
+                TAG,
+                "UPnP specification violation: Not producing <retval> element to be compatible with WMP12: $actionArgument"
+            )
             // appendNewElement(descriptor, actionArgumentElement, ELEMENT.retval);
         }
         XMLUtil.appendNewElementIfNotNull(

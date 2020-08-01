@@ -38,11 +38,12 @@ const val CCM_SERVICE: String = "CameraConnectedMobileService"
 const val CCM_SERVICE_ID: String = "CameraConnectedMobile"
 const val CANON_NAMESPACE: String = "schemas-canon-com"
 const val IMINK_NAMESPACE: String = "urn:schemas-canon-com:schema-imink"
+
 val CCM_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, CCM_SERVICE, 1)
 val MCC_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, MCC_SERVICE, 1)
 
 //legacy service, probably for older EOS cameras
-const val ICPO_SERVICE: String = "ICPO-SmartPhoneEOSSystemService"
+//const val ICPO_SERVICE: String = "ICPO-SmartPhoneEOSSystemService"
 
 //the interval in which the notify and search requests are sent
 const val NOTIFY_INTERVAL: Int = 10
@@ -82,7 +83,7 @@ class MainActivity : AppCompatActivity() {
                     val cameraConnectDevice: LocalDevice? = createDevice()
                     Log.v(TAG, "Registering CameraConnectDevice")
                     upnpService!!.registry.addDevice(cameraConnectDevice)
-                    cameraConnectService = getCameraConnectService()
+                    //cameraConnectService = getCameraConnectService()
                 } catch (ex: Exception) {
                     Log.w(TAG, "Creating CameraConnectDevice device failed $ex")
                     return
