@@ -151,8 +151,12 @@ class PlaceholderFragment : Fragment() {
                 "  </action>\n" +
                 " </actionList>\n" +
                 "</scpd>")
-        textView.text = actionSet.toIminkDescriptorXMLString()
+        //textView.text = actionSet.toIminkDescriptorXMLString()
         return root
+    }
+
+    fun populateGalery(){
+
     }
 
     companion object {

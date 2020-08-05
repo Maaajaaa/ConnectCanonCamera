@@ -3,9 +3,13 @@ package com.github.sparkycola.connectcanoncamera.libimink
 import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import java.io.IOException
+import android.os.Handler
+import android.os.Message
+import com.github.sparkycola.connectcanoncamera.iminkIsReady
 
-class IminkHTTPD : NanoHTTPD(8615) {
+class IminkHTTPD(private val handler: Handler) : NanoHTTPD(8615) {
     private val tag = "IminkHTTPD"
+    private var connectedToCamera = false
     override fun serve(session: IHTTPSession): Response {
 
         val files: Map<String, String>  = HashMap<String, String>();
@@ -40,6 +44,9 @@ class IminkHTTPD : NanoHTTPD(8615) {
                 }
                 if(files["postData"]?.contains("<Status>Stop</Status>")!!) {
                     Log.d(tag, "WE'RE IN")
+                    connectedToCamera = true
+                    //give the response some time to get through
+                    handler.sendEmptyMessageDelayed(iminkIsReady,200)
                     return newFixedLengthResponse(Response.Status.OK,"text/xml","<?xml version=\"1.0\"?>\n" +
                             "<ResultSet xmlns=\"urn:schemas-canon-com:service:CameraConnectedMobileService:1\">\n" +
                             "  <Status>Stop</Status>\n" +
@@ -62,17 +69,6 @@ class IminkHTTPD : NanoHTTPD(8615) {
         }
         //else that also catches non-defined case of other UseCaseStatus
         return newFixedLengthResponse("")
-    }
-
-    companion object {
-        @JvmStatic
-        fun main(args: Array<String>) {
-            try {
-                IminkHTTPD()
-            } catch (ioe: IOException) {
-                System.err.println("Couldn't start server:\n$ioe")
-            }
-        }
     }
 
     init {

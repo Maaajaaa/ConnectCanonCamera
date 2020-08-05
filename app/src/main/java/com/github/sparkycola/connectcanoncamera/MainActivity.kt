@@ -6,16 +6,25 @@
 
 package com.github.sparkycola.connectcanoncamera
 
+import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Message
 import android.util.Log
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager.widget.ViewPager
+import com.android.volley.AuthFailureError
+import com.android.volley.Request
+import com.android.volley.RequestQueue
+import com.android.volley.Response
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.github.sparkycola.connectcanoncamera.libimink.IminkHTTPD
 import com.github.sparkycola.connectcanoncamera.ui.main.SectionsPagerAdapter
 import com.google.android.material.tabs.TabLayout
@@ -27,11 +36,16 @@ import org.fourthline.cling.model.DefaultServiceManager
 import org.fourthline.cling.model.ValidationException
 import org.fourthline.cling.model.message.header.ServiceTypeHeader
 import org.fourthline.cling.model.meta.*
-import org.fourthline.cling.model.types.*
+import org.fourthline.cling.model.types.DeviceType
+import org.fourthline.cling.model.types.ServiceType
+import org.fourthline.cling.model.types.UDADeviceType
+import org.fourthline.cling.model.types.UDN
 import org.fourthline.cling.protocol.RetrieveRemoteDescriptors
 import org.fourthline.cling.registry.DefaultRegistryListener
 import org.fourthline.cling.registry.Registry
 import java.net.ServerSocket
+import java.net.URI
+import java.net.URL
 import java.util.*
 
 //MobileConnectedCamera refers to the camera, a mobile-connected camera
@@ -46,6 +60,8 @@ const val IMINK_NAMESPACE: String = "urn:schemas-canon-com:schema-imink"
 val CCM_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, CCM_SERVICE, 1)
 val MCC_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, MCC_SERVICE, 1)
 
+val iminkIsReady: Int = 400
+
 //port for IMINK
 const val IMINK_PORT = 8615
 
@@ -58,9 +74,11 @@ var hostPort: Int = 0
 var hostAddress = ""
 
 const val UDN_STRING = "2188B849-F71E-4B2D-AAF3-EE57761A9975"
+
+var cameraBaseURL: URL? = null
+var cameraControlURI: URI? = null
+
 class MainActivity : AppCompatActivity() {
-
-
     private var upnpService: AndroidUpnpService? = null
     private lateinit var serverSocket: ServerSocket
 
@@ -68,6 +86,9 @@ class MainActivity : AppCompatActivity() {
     private val udn: UDN = UDN(UUID.fromString("2188B849-F71E-4B2D-AAF3-EE57761A9975"))
     private val TAG = "MainActivity"
     private val cameraRegistryListener: CameraRegistryListener = CameraRegistryListener()
+
+    private lateinit var iminkHTTPD: IminkHTTPD
+    private lateinit var queue : RequestQueue
 
 
     private val serviceConnection: ServiceConnection = object : ServiceConnection {
@@ -113,8 +134,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    public fun refreshDeviceConfiguration(rd: RemoteDevice){
-        upnpService?.configuration?.asyncProtocolExecutor?.execute(RetrieveRemoteDescriptors(upnpService as UpnpService, rd))
+    public fun refreshDeviceConfiguration(rd: RemoteDevice) {
+        upnpService?.configuration?.asyncProtocolExecutor?.execute(
+            RetrieveRemoteDescriptors(
+                upnpService as UpnpService,
+                rd
+            )
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -133,7 +159,82 @@ class MainActivity : AppCompatActivity() {
             serviceConnection,
             Context.BIND_AUTO_CREATE
         )
-        IminkHTTPD()
+        //Todo: make proper handler that is not leaking
+        @SuppressLint("HandlerLeak")
+        val mHandler: Handler = object : Handler() {
+            override fun handleMessage(msg: Message) {
+                when (msg.what) {
+                    iminkIsReady -> startObjectPullMode()
+                }
+                super.handleMessage(msg)
+            }
+        }
+        iminkHTTPD = IminkHTTPD(mHandler)
+        queue = Volley.newRequestQueue(this)
+    }
+
+    private fun startObjectPullMode() {
+        iminkHTTPD.stop()
+        val statusRunString = "<?xml version=\"1.0\"?>\n" +
+                "<ParamSet xmlns=\"urn:schemas-canon-com:service:MobileConnectedCameraService:1\">\n" +
+                "  <Status>Run</Status>\n" +
+                "</ParamSet>"
+        Log.d(TAG, "We're in like Flinn!")
+        //get camera into object pull mode
+        //generate URL
+        val url = URL(
+            cameraBaseURL?.protocol,
+            cameraBaseURL?.host,
+            IMINK_PORT,
+            cameraControlURI.toString() + "UsecaseStatus?Name=ObjectPull&MajorVersion=1&MinorVersion=0"
+        ).toString()
+
+        //String Request initialized
+        val stringRequest: StringRequest =
+            object : StringRequest(Request.Method.POST, url, Response.Listener { response ->
+
+                // Display the first 500 characters of the response string.
+                Log.d(TAG, "pull mode Response is: ${response}")
+                getObjectList()
+
+            }, Response.ErrorListener { error ->
+                Log.d(TAG, "Requesting $url failed: $error")
+            }) {
+                override fun getBodyContentType(): String {
+                    return "text/xml ; charset=utf-8"
+                }
+
+                @Throws(AuthFailureError::class)
+                override fun getBody(): ByteArray {
+                    return statusRunString.toByteArray()
+                }
+            }
+        // Add the request to the RequestQueue.
+        queue.add(stringRequest)
+
+    }
+
+    private fun getObjectList() {
+        //generate URL
+        val url = URL(
+            cameraBaseURL?.protocol,
+            cameraBaseURL?.host,
+            IMINK_PORT,
+            cameraControlURI.toString() + "ObjIDList?StartIndex=1&MaxNum=1&ObjType=ALL"
+        )
+        // Add the request to the RequestQueue.
+        queue.add(simpleGetRequest(url))
+    }
+
+    private fun simpleGetRequest(url: URL):StringRequest{
+        return StringRequest(Request.Method.GET, url.toString(), Response.Listener { response ->
+
+            // Display the first 500 characters of the response string.
+            Log.d(TAG, "object list Response is: $response")
+
+        }, Response.ErrorListener { error ->
+            Log.d(TAG, "Requesting object list at: $url failed: $error")
+        })
     }
 
     override fun onDestroy() {
@@ -205,20 +306,36 @@ class MainActivity : AppCompatActivity() {
 
             Log.v("CaemraRegistryListener", "URL: ${device?.identity?.descriptorURL}")
             Log.v("CaemraRegistryListener", "udn : ${device?.identity?.udn}")
-            if(device?.services?.size == 0 && device.details.friendlyName == "G7X"){
+            if (device?.services?.size == 0 && device.details.friendlyName == "G7X") {
                 //remove device from registry so we can scan for services again
                 //registry?.remoteDevices?.minus(device)
                 registry?.removeDevice(device.identity.udn)
-                registry?.upnpService?.configuration?.asyncProtocolExecutor?.execute(PervasiveRetrieveRemoteDescriptors(registry.upnpService as UpnpService, device))
+                registry?.upnpService?.configuration?.asyncProtocolExecutor?.execute(
+                    PervasiveRetrieveRemoteDescriptors(registry.upnpService as UpnpService, device)
+                )
             }
-            if(device?.services?.size != 0){
-                Log.v("remote dev added", "service list not null")
+            if (device?.services?.size != 0) {
+                cameraBaseURL = device?.details?.baseURL
+                cameraControlURI = device?.services!![0].controlURI
+                Log.v("remote dev added", "service list not null, baseURL is: $cameraBaseURL")
                 Log.v("CaemraRegistryListener", "number of services : ${device?.services!!.size}")
-                Log.v("CaemraRegistryListener", "descriptorURI : ${device?.services!![0].descriptorURI}")
+                Log.v(
+                    "CaemraRegistryListener",
+                    "descriptorURI : ${device?.services!![0].descriptorURI}"
+                )
                 Log.v("CaemraRegistryListener", "controlURI : ${device?.services!![0].controlURI}")
-                Log.v("CaemraRegistryListener", "controlURI : ${device?.services!![0].eventSubscriptionURI}")
-                Log.v("CaemraRegistryListener", "nb of actions : ${device?.services!![0].actions.size}")
-                Log.v("CaemraRegistryListener", "nb of state vars : ${device?.services!![0].stateVariables.size}")
+                Log.v(
+                    "CaemraRegistryListener",
+                    "eventsubURI : ${device?.services!![0].eventSubscriptionURI}"
+                )
+                Log.v(
+                    "CaemraRegistryListener",
+                    "nb of actions : ${device?.services!![0].actions.size}"
+                )
+                Log.v(
+                    "CaemraRegistryListener",
+                    "nb of state vars : ${device?.services!![0].stateVariables.size}"
+                )
             }
         }
 

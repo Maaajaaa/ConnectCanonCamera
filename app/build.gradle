@@ -49,4 +49,6 @@ dependencies {
     // Cling
     implementation 'org.fourthline.cling:cling-support:2.1.2'
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
+    implementation 'com.android.volley:volley:1.1.1'
+
 }
