@@ -48,5 +48,5 @@ dependencies {
     implementation 'org.slf4j:slf4j-jdk14:1.7.14'
     // Cling
     implementation 'org.fourthline.cling:cling-support:2.1.2'
-
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
 }

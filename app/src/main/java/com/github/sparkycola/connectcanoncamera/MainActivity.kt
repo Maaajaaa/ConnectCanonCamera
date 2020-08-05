@@ -16,6 +16,7 @@ import android.util.Log
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager.widget.ViewPager
+import com.github.sparkycola.connectcanoncamera.libimink.IminkHTTPD
 import com.github.sparkycola.connectcanoncamera.ui.main.SectionsPagerAdapter
 import com.google.android.material.tabs.TabLayout
 import org.fourthline.cling.UpnpService
@@ -132,7 +133,7 @@ class MainActivity : AppCompatActivity() {
             serviceConnection,
             Context.BIND_AUTO_CREATE
         )
-
+        IminkHTTPD()
     }
 
     override fun onDestroy() {
