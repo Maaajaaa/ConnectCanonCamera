@@ -18,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager.widget.ViewPager
 import com.github.sparkycola.connectcanoncamera.ui.main.SectionsPagerAdapter
 import com.google.android.material.tabs.TabLayout
+import org.fourthline.cling.UpnpService
 import org.fourthline.cling.android.AndroidUpnpService
 import org.fourthline.cling.binding.LocalServiceBindingException
 import org.fourthline.cling.binding.annotations.AnnotationLocalServiceBinder
@@ -26,8 +27,10 @@ import org.fourthline.cling.model.ValidationException
 import org.fourthline.cling.model.message.header.ServiceTypeHeader
 import org.fourthline.cling.model.meta.*
 import org.fourthline.cling.model.types.*
+import org.fourthline.cling.protocol.RetrieveRemoteDescriptors
 import org.fourthline.cling.registry.DefaultRegistryListener
 import org.fourthline.cling.registry.Registry
+import java.net.ServerSocket
 import java.util.*
 
 //MobileConnectedCamera refers to the camera, a mobile-connected camera
@@ -42,6 +45,9 @@ const val IMINK_NAMESPACE: String = "urn:schemas-canon-com:schema-imink"
 val CCM_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, CCM_SERVICE, 1)
 val MCC_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, MCC_SERVICE, 1)
 
+//port for IMINK
+const val IMINK_PORT = 8615
+
 //legacy service, probably for older EOS cameras
 //const val ICPO_SERVICE: String = "ICPO-SmartPhoneEOSSystemService"
 
@@ -50,9 +56,12 @@ const val NOTIFY_INTERVAL: Int = 10
 var hostPort: Int = 0
 var hostAddress = ""
 
+const val UDN_STRING = "2188B849-F71E-4B2D-AAF3-EE57761A9975"
 class MainActivity : AppCompatActivity() {
 
+
     private var upnpService: AndroidUpnpService? = null
+    private lateinit var serverSocket: ServerSocket
 
     // TODO: Generate and store
     private val udn: UDN = UDN(UUID.fromString("2188B849-F71E-4B2D-AAF3-EE57761A9975"))
@@ -69,8 +78,6 @@ class MainActivity : AppCompatActivity() {
 
             // Get ready for future device advertisements
             upnpService!!.registry.addListener(cameraRegistryListener)
-
-            // Now add all devices to the list we already know about
 
             // Now add all devices to the list we already know about
             for (device in upnpService!!.registry.devices) {
@@ -105,6 +112,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    public fun refreshDeviceConfiguration(rd: RemoteDevice){
+        upnpService?.configuration?.asyncProtocolExecutor?.execute(RetrieveRemoteDescriptors(upnpService as UpnpService, rd))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -121,7 +132,6 @@ class MainActivity : AppCompatActivity() {
             serviceConnection,
             Context.BIND_AUTO_CREATE
         )
-
 
     }
 
@@ -191,22 +201,28 @@ class MainActivity : AppCompatActivity() {
 
 
             Log.v("CameraRegistyListener", "Device added:  ${device?.details?.friendlyName}")
+
             Log.v("CaemraRegistryListener", "URL: ${device?.identity?.descriptorURL}")
             Log.v("CaemraRegistryListener", "udn : ${device?.identity?.udn}")
-
-            /*Log.v("CaemraRegistryListener", "number of services : ${device?.services!!.size}")
-            Log.v("CaemraRegistryListener", "descriptorURI : ${device?.services!![0].descriptorURI}")
-            Log.v("CaemraRegistryListener", "controlURI : ${device?.services!![0].controlURI}")
-            Log.v("CaemraRegistryListener", "controlURI : ${device?.services!![0].eventSubscriptionURI}")
-            Log.v("CaemraRegistryListener", "nb of actions : ${device?.services!![0].actions.size}")
-            Log.v("CaemraRegistryListener", "nb of state vars : ${device?.services!![0].stateVariables!![0].name}")
-            Log.v("CaemraRegistryListener", "nb of state vars : ${device?.services!![0].stateVariables!![0].typeDetails}")
-            Log.v("CaemraRegistryListener", "nb of state vars : ${device?.services!![0].stateVariables!![0]}")*/
+            if(device?.services?.size == 0 && device.details.friendlyName == "G7X"){
+                //remove device from registry so we can scan for services again
+                //registry?.remoteDevices?.minus(device)
+                registry?.removeDevice(device.identity.udn)
+                registry?.upnpService?.configuration?.asyncProtocolExecutor?.execute(PervasiveRetrieveRemoteDescriptors(registry.upnpService as UpnpService, device))
+            }
+            if(device?.services?.size != 0){
+                Log.v("remote dev added", "service list not null")
+                Log.v("CaemraRegistryListener", "number of services : ${device?.services!!.size}")
+                Log.v("CaemraRegistryListener", "descriptorURI : ${device?.services!![0].descriptorURI}")
+                Log.v("CaemraRegistryListener", "controlURI : ${device?.services!![0].controlURI}")
+                Log.v("CaemraRegistryListener", "controlURI : ${device?.services!![0].eventSubscriptionURI}")
+                Log.v("CaemraRegistryListener", "nb of actions : ${device?.services!![0].actions.size}")
+                Log.v("CaemraRegistryListener", "nb of state vars : ${device?.services!![0].stateVariables.size}")
+            }
         }
 
         override fun remoteDeviceRemoved(registry: Registry?, device: RemoteDevice?) {
             Log.v("CameraRegistyListener", "Device REMOVED:  ${device?.details?.friendlyName}")
-
         }
 
         override fun localDeviceAdded(registry: Registry?, device: LocalDevice?) {

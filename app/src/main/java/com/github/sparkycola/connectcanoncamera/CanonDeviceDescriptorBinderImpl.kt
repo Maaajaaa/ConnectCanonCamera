@@ -18,6 +18,7 @@ import org.fourthline.cling.model.profile.RemoteClientInfo
 import org.fourthline.cling.model.types.InvalidValueException
 import org.fourthline.cling.model.types.ServiceId
 import org.fourthline.cling.model.types.ServiceType
+import org.fourthline.cling.model.types.UDN
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.Node
@@ -147,7 +148,7 @@ class CanonDeviceDescriptorBinderImpl : UDA10DeviceDescriptorBinderImpl() {
                             }
                         }
                         if (serviceChild.localName == "X_SCPDURL" && serviceChild.namespaceURI == "urn:schemas-canon-com:schema-imink") {
-                            iminkSCPDURL = parseURI(XMLUtil.getTextContent(serviceChild))
+                            iminkSCPDURL = parseURI("${XMLUtil.getTextContent(serviceChild)}?uuid=$UDN_STRING")
                             Log.d(
                                 TAG,
                                 "found iminkSCPDURL: ${serviceChild.textContent} parsed as: $iminkSCPDURL"

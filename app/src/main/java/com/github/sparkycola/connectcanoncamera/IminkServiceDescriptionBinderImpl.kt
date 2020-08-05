@@ -1,6 +1,9 @@
 package com.github.sparkycola.connectcanoncamera
 
 import android.util.Log
+import org.fourthline.cling.binding.staging.MutableAction
+import org.fourthline.cling.binding.staging.MutableActionArgument
+import org.fourthline.cling.binding.staging.MutableService
 import org.fourthline.cling.binding.xml.Descriptor
 import org.fourthline.cling.binding.xml.Descriptor.Service.ATTRIBUTE
 import org.fourthline.cling.binding.xml.DescriptorBindingException
@@ -10,11 +13,18 @@ import org.fourthline.cling.model.meta.*
 import org.fourthline.cling.model.types.CustomDatatype
 import org.w3c.dom.Document
 import org.w3c.dom.Element
+import org.w3c.dom.Node
 import java.util.*
 import javax.xml.parsers.DocumentBuilderFactory
 
+
 class IminkServiceDescriptionBinderImpl : UDA10ServiceDescriptorBinderImpl() {
     private val TAG = "IminkSrvcDescBindImpl"
+
+    enum class iminkDirection(val upnpDirection: ActionArgument.Direction){
+        get(ActionArgument.Direction.OUT),
+        set(ActionArgument.Direction.IN)
+    }
 
     @Throws(DescriptorBindingException::class)
     override fun buildDOM(service: Service<*, *>): Document? {
@@ -31,6 +41,110 @@ class IminkServiceDescriptionBinderImpl : UDA10ServiceDescriptorBinderImpl() {
                 "Could not generate service descriptor: " + ex.message,
                 ex
             )
+        }
+    }
+
+    //no changes made, just some extra debugging output in case it doesn't work (with other cameras)
+    override fun hydrateBasic(
+        descriptor: MutableService,
+        undescribedService: Service<*, *>
+    ) {
+        descriptor.serviceId = undescribedService.serviceId
+        descriptor.serviceType = undescribedService.serviceType
+        Log.d(TAG, "service found id: ${descriptor.serviceId} type: ${descriptor.serviceType}")
+        if (undescribedService is RemoteService) {
+            val rs = undescribedService
+            descriptor.controlURI = rs.controlURI
+            descriptor.eventSubscriptionURI = rs.eventSubscriptionURI
+            descriptor.descriptorURI = rs.descriptorURI
+            Log.d(TAG, "it's remote and controlURI: ${descriptor.controlURI}, " +
+                    "eventsub: ${descriptor.eventSubscriptionURI}" +
+                    "descriptorURI: ${descriptor.descriptorURI}")
+        }
+    }
+
+    @Throws(DescriptorBindingException::class)
+    override fun hydrateRoot(
+        descriptor: MutableService?,
+        rootElement: Element
+    ) {
+
+        // We don't check the XMLNS, nobody bothers anyway...
+        if (!Descriptor.Service.ELEMENT.scpd.equals(rootElement)) {
+            throw DescriptorBindingException("Root element name is not <scpd>: " + rootElement.nodeName)
+        }
+        val rootChildren = rootElement.childNodes
+        for (i in 0 until rootChildren.length) {
+            val rootChild = rootChildren.item(i)
+            if (rootChild.nodeType != Node.ELEMENT_NODE) continue
+            when {
+                Descriptor.Service.ELEMENT.specVersion.equals(
+                    rootChild
+                ) -> {
+                    // We don't care about UDA major/minor specVersion anymore - whoever had the brilliant idea that
+                    // the spec versions can be declared on devices _AND_ on their services should have their fingers
+                    // broken so they never touch a keyboard again.
+                    // hydrateSpecVersion(descriptor, rootChild);
+                }
+                Descriptor.Service.ELEMENT.actionList.equals(
+                    rootChild
+                ) -> {
+                    hydrateActionList(descriptor, rootChild)
+                }
+                Descriptor.Service.ELEMENT.serviceStateTable.equals(
+                    rootChild
+                ) -> {
+                    hydrateServiceStateTableList(descriptor, rootChild)
+                }
+                else -> {
+                    Log.d(TAG,"Ignoring unknown element: " + rootChild.nodeName)
+                }
+            }
+        }
+
+        if(descriptor?.serviceType == MCC_SERVICE_TYPE){
+            //Todo: generate fake service state table
+        }
+    }
+
+    override fun hydrateAction(action: MutableAction, actionNode: Node) {
+        val actionNodeChildren = actionNode.childNodes
+        for (i in 0 until actionNodeChildren.length) {
+            val actionNodeChild = actionNodeChildren.item(i)
+            if (actionNodeChild.nodeType != Node.ELEMENT_NODE) continue
+            if (Descriptor.Service.ELEMENT.name.equals(
+                    actionNodeChild
+                )
+            ) {
+                action.name = XMLUtil.getTextContent(actionNodeChild)
+            } else if (Descriptor.Service.ELEMENT.argumentList.equals(
+                    actionNodeChild
+                )
+            ) {
+                val argumentChildren = actionNodeChild.childNodes
+                for (j in 0 until argumentChildren.length) {
+                    val actionArgument = MutableActionArgument()
+                    val argumentChild = argumentChildren.item(j)
+                    if (argumentChild.nodeType != Node.ELEMENT_NODE) continue
+                    when(argumentChild.nodeName){
+                        "argumentList" -> {
+                            val actionArgument = MutableActionArgument()
+                            hydrateActionArgument(actionArgument, argumentChild)
+                            action.arguments.add(actionArgument)
+                        }
+                        //imink arguments
+                        //Todo: check namespace, just for cleanliness
+                        "X_actKind" -> {
+                            actionArgument.direction =
+                                iminkDirection.valueOf(argumentChild.textContent.toLowerCase()).upnpDirection
+                        }
+
+                        "X_resourceName" -> {
+                            actionArgument.relatedStateVariable = argumentChild.textContent
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -87,11 +201,21 @@ class IminkServiceDescriptionBinderImpl : UDA10ServiceDescriptorBinderImpl() {
         descriptor: Document,
         scpdElement: Element
     ) {
-        val actionListElement = XMLUtil.appendNewElement(
-            descriptor,
+        val actionListElement: Element
+        if (serviceModel.serviceType == CCM_SERVICE_TYPE){
+            actionListElement = XMLUtil.appendNewElement(
+                    descriptor,
             scpdElement,
             Descriptor.Service.ELEMENT.actionList
-        )
+            )
+        }else{
+            actionListElement = XMLUtil.appendNewElement(
+                descriptor,
+                scpdElement,
+                Descriptor.Service.ELEMENT.actionList
+            )
+
+        }
         for (action in serviceModel.actions) {
             if (action.name != QueryStateVariableAction.ACTION_NAME) generateAction(
                 serviceModel,
