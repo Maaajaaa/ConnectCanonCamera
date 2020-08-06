@@ -11,13 +11,14 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.os.Bundle
-import android.os.Handler
-import android.os.IBinder
-import android.os.Message
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.*
+import android.system.Os.write
 import android.util.Log
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.ViewModelProviders
 import androidx.viewpager.widget.ViewPager
 import com.android.volley.AuthFailureError
 import com.android.volley.Request
@@ -26,8 +27,11 @@ import com.android.volley.Response
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import com.github.sparkycola.connectcanoncamera.libimink.IminkHTTPD
+import com.github.sparkycola.connectcanoncamera.ui.main.PageViewModel
 import com.github.sparkycola.connectcanoncamera.ui.main.SectionsPagerAdapter
 import com.google.android.material.tabs.TabLayout
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.android.AndroidUpnpService
 import org.fourthline.cling.binding.LocalServiceBindingException
@@ -40,13 +44,19 @@ import org.fourthline.cling.model.types.DeviceType
 import org.fourthline.cling.model.types.ServiceType
 import org.fourthline.cling.model.types.UDADeviceType
 import org.fourthline.cling.model.types.UDN
-import org.fourthline.cling.protocol.RetrieveRemoteDescriptors
 import org.fourthline.cling.registry.DefaultRegistryListener
 import org.fourthline.cling.registry.Registry
-import java.net.ServerSocket
+import org.w3c.dom.Document
+import java.io.*
+import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
+import java.nio.file.Files.write
 import java.util.*
+import javax.mail.internet.MimeMultipart
+import javax.mail.util.ByteArrayDataSource
+import javax.xml.parsers.DocumentBuilderFactory
+import kotlin.collections.ArrayList
 
 //MobileConnectedCamera refers to the camera, a mobile-connected camera
 const val MCC_SERVICE: String = "MobileConnectedCameraService"
@@ -68,22 +78,23 @@ const val IMINK_PORT = 8615
 //legacy service, probably for older EOS cameras
 //const val ICPO_SERVICE: String = "ICPO-SmartPhoneEOSSystemService"
 
-//the interval in which the notify and search requests are sent
+//the interval (in s( in which the notify and search requests are sent
 const val NOTIFY_INTERVAL: Int = 10
 var hostPort: Int = 0
 var hostAddress = ""
 
+// TODO: Generate and store
 const val UDN_STRING = "2188B849-F71E-4B2D-AAF3-EE57761A9975"
 
 var cameraBaseURL: URL? = null
 var cameraControlURI: URI? = null
 
 class MainActivity : AppCompatActivity() {
-    private var upnpService: AndroidUpnpService? = null
-    private lateinit var serverSocket: ServerSocket
+    private lateinit var viewModel: PageViewModel
 
-    // TODO: Generate and store
-    private val udn: UDN = UDN(UUID.fromString("2188B849-F71E-4B2D-AAF3-EE57761A9975"))
+    private var upnpService: AndroidUpnpService? = null
+
+    private val udn: UDN = UDN(UUID.fromString(UDN_STRING))
     private val TAG = "MainActivity"
     private val cameraRegistryListener: CameraRegistryListener = CameraRegistryListener()
 
@@ -122,6 +133,7 @@ class MainActivity : AppCompatActivity() {
             val activeStreamServers = upnpService!!.get().router.getActiveStreamServers(null)
             for (streamServer in activeStreamServers) {
                 Log.d(TAG, "stream server at: ${streamServer.address}:${streamServer.port}")
+                viewModel.text.postValue("stream server at: ${streamServer.address}:${streamServer.port}")
                 hostPort = streamServer.port
                 hostAddress = streamServer.address.hostAddress
             }
@@ -134,16 +146,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    public fun refreshDeviceConfiguration(rd: RemoteDevice) {
-        upnpService?.configuration?.asyncProtocolExecutor?.execute(
-            RetrieveRemoteDescriptors(
-                upnpService as UpnpService,
-                rd
-            )
-        )
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
+
+        Log.d(TAG, (0x45.toChar()).toString())
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         val sectionsPagerAdapter = SectionsPagerAdapter(this, supportFragmentManager)
@@ -152,6 +157,8 @@ class MainActivity : AppCompatActivity() {
         val tabs: TabLayout = findViewById(R.id.tabs)
         tabs.setupWithViewPager(viewPager)
         (tabs.getChildAt(0) as ViewGroup).getChildAt(1).isEnabled = false
+
+        viewModel = ViewModelProviders.of(this).get(PageViewModel::class.java)
 
         //bind upnp service
         applicationContext.bindService(
@@ -194,7 +201,7 @@ class MainActivity : AppCompatActivity() {
             object : StringRequest(Request.Method.POST, url, Response.Listener { response ->
 
                 // Display the first 500 characters of the response string.
-                Log.d(TAG, "pull mode Response is: ${response}")
+                Log.d(TAG, "pull mode Response is: $response")
                 getObjectList()
 
             }, Response.ErrorListener { error ->
@@ -222,19 +229,35 @@ class MainActivity : AppCompatActivity() {
             IMINK_PORT,
             cameraControlURI.toString() + "ObjIDList?StartIndex=1&MaxNum=1&ObjType=ALL"
         )
+        val dbFactory =
+            DocumentBuilderFactory.newInstance()
+        val dBuilder = dbFactory.newDocumentBuilder()
+        GlobalScope.launch {
+            val doc: Document = dBuilder.parse(url.toString())
+            val totalNumber = Integer.valueOf(doc.getElementsByTagName("TotalNum").item(0).textContent)
+            val initialObjectID = doc.getElementsByTagName("ObjIDList-1").item(0).textContent
+            Log.d(TAG, "Total Number of Elements: $totalNumber")
+            val thumbUrl = URL(
+                cameraBaseURL?.protocol,
+                cameraBaseURL?.host,
+                IMINK_PORT,
+                cameraControlURI.toString() + "ObjParsingExifHeaderList?ListNum=1&ObjIDList-1=$initialObjectID"
+            )
+            var bitmap = getThumbFromURL(thumbUrl)
+            viewModel.bitmap.postValue(bitmap)
+        }
         // Add the request to the RequestQueue.
-        queue.add(simpleGetRequest(url))
-    }
-
-    private fun simpleGetRequest(url: URL):StringRequest{
-        return StringRequest(Request.Method.GET, url.toString(), Response.Listener { response ->
+        val objectListLengthRequest = StringRequest(Request.Method.GET, url.toString(), Response.Listener { response ->
 
             // Display the first 500 characters of the response string.
             Log.d(TAG, "object list Response is: $response")
+            //val totalNumber = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(In)//.getElementById("TotalNum").textContent
+            // Log.d(TAG, "Total Number of Elements: $totalNumber")
 
         }, Response.ErrorListener { error ->
             Log.d(TAG, "Requesting object list at: $url failed: $error")
         })
+        //queue.add(objectListLengthRequest)
     }
 
     override fun onDestroy() {
@@ -278,6 +301,50 @@ class MainActivity : AppCompatActivity() {
             deviceDetails,
             service
         )
+    }
+
+    private fun getThumbFromURL(src: URL): Bitmap? {
+        try {
+            val connection: HttpURLConnection = src
+                .openConnection() as HttpURLConnection
+            connection.doInput = true
+            connection.connect()
+            val input: InputStream = connection.inputStream
+            val ds = ByteArrayDataSource(input, "multipart/mixed")
+            val multipart = MimeMultipart(ds)
+            for(i in 0 until multipart.count){
+                Log.d(TAG, "got part $i with type ${multipart.getBodyPart(i).contentType} and filename ${multipart.getBodyPart(i).fileName}")
+                if(multipart.getBodyPart(i).contentType == "application/octet-stream ;Object-ID=objid1"){
+                    val bytes = multipart.getBodyPart(i).content as ByteArrayInputStream
+                    val byteArray = bytes.readBytes()
+                    val ffIndexes = ArrayList<Int>()
+                    //Todo: streamline this parsing, many optimisations should be possible
+                    //last 8 bytes need to be FF D8 FF DB (something) and FF D9
+                    byteArray.forEachIndexed { index, byte -> if (index + 8 < byteArray.size - 5 && byte == 0xFF.toByte() && byteArray[index+1] == 0xD8.toByte()&& byteArray[index+2] == 0xFF.toByte()&& byteArray[index+3] == 0xDB.toByte()){ffIndexes.add(index)} }
+                    ffIndexes.forEach { Log.d(TAG, "ff found at: $it") }
+                    val f9Indexes = ArrayList<Int>()
+                    byteArray.forEachIndexed { index, byte -> if (index + 1 < byteArray.size && byte == 0xFF.toByte() && byteArray[index+1] == 0xD9.toByte()){f9Indexes.add(index)} }
+                    f9Indexes.forEach { Log.d(TAG, "f9 found at: $it") }
+                    if(f9Indexes.size >= 1 && ffIndexes.size >= 1 && ffIndexes[0] < f9Indexes[0]){
+                        //Don't forget to include the ff d9 in the end
+                        val parsedImage = byteArray.sliceArray(IntRange(ffIndexes[0],f9Indexes[0]+2))
+                        try{
+                            //debug saving
+                            FileOutputStream(File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "thumb.jpg")).write(parsedImage)
+                            return BitmapFactory.decodeFile(File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "thumb.jpg").toString())
+                        }catch (e: java.lang.Exception){
+                            Log.e(TAG,e.message!!)
+                        }
+                    }else{
+                        Log.w(TAG,"Invalid thumbnail")
+                    }
+                }
+            }
+            return null
+        } catch (e: IOException) {
+            e.printStackTrace()
+            return null
+        }
     }
 
     class CameraRegistryListener : DefaultRegistryListener() {

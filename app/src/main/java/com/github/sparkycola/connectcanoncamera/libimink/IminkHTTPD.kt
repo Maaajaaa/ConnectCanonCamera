@@ -5,9 +5,10 @@ import fi.iki.elonen.NanoHTTPD
 import java.io.IOException
 import android.os.Handler
 import android.os.Message
+import com.github.sparkycola.connectcanoncamera.IMINK_PORT
 import com.github.sparkycola.connectcanoncamera.iminkIsReady
 
-class IminkHTTPD(private val handler: Handler) : NanoHTTPD(8615) {
+class IminkHTTPD(private val handler: Handler) : NanoHTTPD(IMINK_PORT) {
     private val tag = "IminkHTTPD"
     private var connectedToCamera = false
     override fun serve(session: IHTTPSession): Response {
