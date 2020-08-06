@@ -14,7 +14,6 @@ import android.content.ServiceConnection
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.*
-import android.system.Os.write
 import android.util.Log
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
@@ -51,7 +50,6 @@ import java.io.*
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
-import java.nio.file.Files.write
 import java.util.*
 import javax.mail.internet.MimeMultipart
 import javax.mail.util.ByteArrayDataSource
@@ -237,13 +235,7 @@ class MainActivity : AppCompatActivity() {
             val totalNumber = Integer.valueOf(doc.getElementsByTagName("TotalNum").item(0).textContent)
             val initialObjectID = doc.getElementsByTagName("ObjIDList-1").item(0).textContent
             Log.d(TAG, "Total Number of Elements: $totalNumber")
-            val thumbUrl = URL(
-                cameraBaseURL?.protocol,
-                cameraBaseURL?.host,
-                IMINK_PORT,
-                cameraControlURI.toString() + "ObjParsingExifHeaderList?ListNum=1&ObjIDList-1=$initialObjectID"
-            )
-            var bitmap = getThumbFromURL(thumbUrl)
+            var bitmap = getThumbOfObject(initialObjectID.toInt())
             viewModel.bitmap.postValue(bitmap)
         }
         // Add the request to the RequestQueue.
@@ -301,6 +293,17 @@ class MainActivity : AppCompatActivity() {
             deviceDetails,
             service
         )
+    }
+
+    private fun getThumbOfObject(objectID: Int): Bitmap?{
+        //generate URL
+        val thumbUrl = URL(
+            cameraBaseURL?.protocol,
+            cameraBaseURL?.host,
+            IMINK_PORT,
+            cameraControlURI.toString() + "ObjParsingExifHeaderList?ListNum=1&ObjIDList-1=$objectID"
+        )
+        return getThumbFromURL(thumbUrl)
     }
 
     private fun getThumbFromURL(src: URL): Bitmap? {
