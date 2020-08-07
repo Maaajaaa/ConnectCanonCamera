@@ -68,10 +68,11 @@ const val IMINK_NAMESPACE: String = "urn:schemas-canon-com:schema-imink"
 val CCM_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, CCM_SERVICE, 1)
 val MCC_SERVICE_TYPE: ServiceType = ServiceType(CANON_NAMESPACE, MCC_SERVICE, 1)
 
-val iminkIsReady: Int = 400
+const val iminkIsReady: Int = 400
 
 //port for IMINK
 const val IMINK_PORT = 8615
+
 
 //legacy service, probably for older EOS cameras
 //const val ICPO_SERVICE: String = "ICPO-SmartPhoneEOSSystemService"
@@ -88,6 +89,14 @@ var cameraBaseURL: URL? = null
 var cameraControlURI: URI? = null
 
 class MainActivity : AppCompatActivity() {
+    /*cameraObjects is a list, starting at the oldest object, of dictionaries
+        containing objID: unique identifier of each picture given to it by the
+        camera, required for loading the EXIF header and downloading the image
+        objType: type of picture/video, can be JPEG, CR2, JPEG+CR2 or MP4?
+        groupNbr: number of pictures in a group of pictures taken in
+        CreativeShot mode, all of them seem to be referenced by the same ID*/
+
+    private lateinit var cameraObjects: MutableMap<Int, List<String?>>
     private lateinit var viewModel: PageViewModel
 
     private var upnpService: AndroidUpnpService? = null
@@ -97,7 +106,7 @@ class MainActivity : AppCompatActivity() {
     private val cameraRegistryListener: CameraRegistryListener = CameraRegistryListener()
 
     private lateinit var iminkHTTPD: IminkHTTPD
-    private lateinit var queue : RequestQueue
+    private lateinit var queue: RequestQueue
 
 
     private val serviceConnection: ServiceConnection = object : ServiceConnection {
@@ -198,7 +207,6 @@ class MainActivity : AppCompatActivity() {
         val stringRequest: StringRequest =
             object : StringRequest(Request.Method.POST, url, Response.Listener { response ->
 
-                // Display the first 500 characters of the response string.
                 Log.d(TAG, "pull mode Response is: $response")
                 getObjectList()
 
@@ -219,25 +227,74 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    private fun objectIDURL(startIndex: Int, maxNum: Int, groupType: Int?=null): String {
+        return if (groupType == null) {
+            URL(
+                cameraBaseURL?.protocol,
+                cameraBaseURL?.host,
+                IMINK_PORT,
+                cameraControlURI.toString() + "ObjIDList?StartIndex=$startIndex&MaxNum=$maxNum&ObjType=ALL"
+            ).toString()
+        }else{
+            URL(
+                cameraBaseURL?.protocol,
+                cameraBaseURL?.host,
+                IMINK_PORT,
+                cameraControlURI.toString() + "ObjIDList?StartIndex=$startIndex&MaxNum=$maxNum&ObjType=ALL&GroupType=$groupType"
+            ).toString()
+        }
+    }
+
     private fun getObjectList() {
-        //generate URL
-        val url = URL(
-            cameraBaseURL?.protocol,
-            cameraBaseURL?.host,
-            IMINK_PORT,
-            cameraControlURI.toString() + "ObjIDList?StartIndex=1&MaxNum=1&ObjType=ALL"
-        )
         val dbFactory =
             DocumentBuilderFactory.newInstance()
         val dBuilder = dbFactory.newDocumentBuilder()
         GlobalScope.launch {
-            val doc: Document = dBuilder.parse(url.toString())
-            val totalNumber = Integer.valueOf(doc.getElementsByTagName("TotalNum").item(0).textContent)
+            //the retrieval is 1-based
+            val doc: Document = dBuilder.parse(objectIDURL(1, 1))
+            val totalNumber =
+                Integer.valueOf(doc.getElementsByTagName("TotalNum").item(0).textContent)
             val initialObjectID = doc.getElementsByTagName("ObjIDList-1").item(0).textContent
             Log.d(TAG, "Total Number of Elements: $totalNumber")
-            var bitmap = getThumbOfObject(initialObjectID.toInt())
-            viewModel.bitmap.postValue(bitmap)
+            //show first image's thumbnail
+            viewModel.bitmap.postValue(getThumbOfObject(initialObjectID.toInt()))
+
+            //initialize cameraObjects
+            cameraObjects = mutableMapOf()
+
+            //retrieve all objectIDs, G7X sends a maximum of 99 Objects per packet, so if we have more pictures we need to iterate longer
+            while (cameraObjects.size < totalNumber) {
+                // get images starting with the last we added (camera counts 1-based) and as many as we're still missing
+                // the camera won't bitch if we request too many but still only send 99 per packet (G7X, other cameras could differ but probably not)
+                val url = objectIDURL(cameraObjects.size + 1, totalNumber - cameraObjects.size, 1)
+                val doc: Document = dBuilder.parse(url)
+                //iterate over the items in the retrieved list
+                for (listID in 1 until doc.getElementsByTagName("ListCount")
+                    .item(0).textContent.toInt()) {
+                    val objectID =
+                        doc.getElementsByTagName("ObjIDList-$listID").item(0)?.textContent?.toInt()
+                    val objType =
+                        doc.getElementsByTagName("ObjTypeList-$listID").item(0)?.textContent
+                    val groupNum =
+                        doc.getElementsByTagName("GroupedNumList-$listID").item(0)?.textContent
+                    //assign object ID, group num can be null
+                    if (objectID == null || objType.isNullOrEmpty()) {
+                        Log.e(
+                            TAG,
+                            "invalid listID $listID at number ${cameraObjects.size}, totalNumber is: $totalNumber"
+                        )
+                        Log.e(
+                            TAG,
+                            "CHECK FOR FAILS: objectID: $objectID\tobjectType: $objType\tgroupNum: $groupNum"
+                        )
+                    } else {
+                        cameraObjects[objectID] = listOf(objType, groupNum)
+                        Log.d(TAG, "objectID: $objectID\tobjectType: $objType\tgroupNum: $groupNum")
+                    }
+                }
+            }
         }
+        /*
         // Add the request to the RequestQueue.
         val objectListLengthRequest = StringRequest(Request.Method.GET, url.toString(), Response.Listener { response ->
 
@@ -248,7 +305,7 @@ class MainActivity : AppCompatActivity() {
 
         }, Response.ErrorListener { error ->
             Log.d(TAG, "Requesting object list at: $url failed: $error")
-        })
+        })*/
         //queue.add(objectListLengthRequest)
     }
 
@@ -295,7 +352,7 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun getThumbOfObject(objectID: Int): Bitmap?{
+    private fun getThumbOfObject(objectID: Int): Bitmap? {
         //generate URL
         val thumbUrl = URL(
             cameraBaseURL?.protocol,
@@ -315,31 +372,57 @@ class MainActivity : AppCompatActivity() {
             val input: InputStream = connection.inputStream
             val ds = ByteArrayDataSource(input, "multipart/mixed")
             val multipart = MimeMultipart(ds)
-            for(i in 0 until multipart.count){
-                Log.d(TAG, "got part $i with type ${multipart.getBodyPart(i).contentType} and filename ${multipart.getBodyPart(i).fileName}")
-                if(multipart.getBodyPart(i).contentType == "application/octet-stream ;Object-ID=objid1"){
+            for (i in 0 until multipart.count) {
+                Log.d(
+                    TAG,
+                    "got part $i with type ${multipart.getBodyPart(i).contentType} and filename ${multipart.getBodyPart(
+                        i
+                    ).fileName}"
+                )
+                if (multipart.getBodyPart(i).contentType == "application/octet-stream ;Object-ID=objid1") {
                     val bytes = multipart.getBodyPart(i).content as ByteArrayInputStream
                     val byteArray = bytes.readBytes()
                     val ffIndexes = ArrayList<Int>()
                     //Todo: streamline this parsing, many optimisations should be possible
                     //last 8 bytes need to be FF D8 FF DB (something) and FF D9
-                    byteArray.forEachIndexed { index, byte -> if (index + 8 < byteArray.size - 5 && byte == 0xFF.toByte() && byteArray[index+1] == 0xD8.toByte()&& byteArray[index+2] == 0xFF.toByte()&& byteArray[index+3] == 0xDB.toByte()){ffIndexes.add(index)} }
-                    ffIndexes.forEach { Log.d(TAG, "ff found at: $it") }
-                    val f9Indexes = ArrayList<Int>()
-                    byteArray.forEachIndexed { index, byte -> if (index + 1 < byteArray.size && byte == 0xFF.toByte() && byteArray[index+1] == 0xD9.toByte()){f9Indexes.add(index)} }
-                    f9Indexes.forEach { Log.d(TAG, "f9 found at: $it") }
-                    if(f9Indexes.size >= 1 && ffIndexes.size >= 1 && ffIndexes[0] < f9Indexes[0]){
-                        //Don't forget to include the ff d9 in the end
-                        val parsedImage = byteArray.sliceArray(IntRange(ffIndexes[0],f9Indexes[0]+2))
-                        try{
-                            //debug saving
-                            FileOutputStream(File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "thumb.jpg")).write(parsedImage)
-                            return BitmapFactory.decodeFile(File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "thumb.jpg").toString())
-                        }catch (e: java.lang.Exception){
-                            Log.e(TAG,e.message!!)
+                    byteArray.forEachIndexed { index, byte ->
+                        if (index + 8 < byteArray.size - 5 && byte == 0xFF.toByte() && byteArray[index + 1] == 0xD8.toByte() && byteArray[index + 2] == 0xFF.toByte() && byteArray[index + 3] == 0xDB.toByte()) {
+                            ffIndexes.add(index)
                         }
-                    }else{
-                        Log.w(TAG,"Invalid thumbnail")
+                    }
+                    ffIndexes.forEach { Log.d(TAG, "ffd8ffdb (jpeg magic number) found at: $it") }
+                    val f9Indexes = ArrayList<Int>()
+                    byteArray.forEachIndexed { index, byte ->
+                        if (index + 1 < byteArray.size && byte == 0xFF.toByte() && byteArray[index + 1] == 0xD9.toByte()) {
+                            f9Indexes.add(index)
+                        }
+                    }
+                    f9Indexes.forEach { Log.d(TAG, "ffd9 (jpeg file end) found at: $it") }
+                    if (f9Indexes.size >= 1 && ffIndexes.size >= 1 && ffIndexes[0] < f9Indexes[0]) {
+                        //Don't forget to include the ff d9 in the end
+                        val parsedImage =
+                            byteArray.sliceArray(IntRange(ffIndexes[0], f9Indexes[0] + 2))
+                        try {
+                            //debug saving
+                            FileOutputStream(
+                                File(
+                                    Environment.getExternalStoragePublicDirectory(
+                                        Environment.DIRECTORY_DOWNLOADS
+                                    ), "thumb.jpg"
+                                )
+                            ).write(parsedImage)
+                            return BitmapFactory.decodeFile(
+                                File(
+                                    Environment.getExternalStoragePublicDirectory(
+                                        Environment.DIRECTORY_DOWNLOADS
+                                    ), "thumb.jpg"
+                                ).toString()
+                            )
+                        } catch (e: java.lang.Exception) {
+                            Log.e(TAG, e.message!!)
+                        }
+                    } else {
+                        Log.w(TAG, "Invalid thumbnail")
                     }
                 }
             }
