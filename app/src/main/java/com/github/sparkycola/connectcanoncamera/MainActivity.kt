@@ -15,7 +15,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.*
 import android.util.Log
-import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProviders
 import androidx.viewpager.widget.ViewPager
@@ -155,7 +154,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
-        Log.d(TAG, (0x45.toChar()).toString())
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         val sectionsPagerAdapter = SectionsPagerAdapter(this, supportFragmentManager)
@@ -163,7 +161,7 @@ class MainActivity : AppCompatActivity() {
         viewPager.adapter = sectionsPagerAdapter
         val tabs: TabLayout = findViewById(R.id.tabs)
         tabs.setupWithViewPager(viewPager)
-        (tabs.getChildAt(0) as ViewGroup).getChildAt(1).isEnabled = false
+        //(tabs.getChildAt(0) as ViewGroup).getChildAt(1).isEnabled = false
 
         viewModel = ViewModelProviders.of(this).get(PageViewModel::class.java)
 
@@ -205,7 +203,7 @@ class MainActivity : AppCompatActivity() {
 
         //String Request initialized
         val stringRequest: StringRequest =
-            object : StringRequest(Request.Method.POST, url, Response.Listener { response ->
+            object : StringRequest(Method.POST, url, Response.Listener { response ->
 
                 Log.d(TAG, "pull mode Response is: $response")
                 getObjectList()
@@ -471,23 +469,23 @@ class MainActivity : AppCompatActivity() {
                 cameraBaseURL = device?.details?.baseURL
                 cameraControlURI = device?.services!![0].controlURI
                 Log.v("remote dev added", "service list not null, baseURL is: $cameraBaseURL")
-                Log.v("CaemraRegistryListener", "number of services : ${device?.services!!.size}")
+                Log.v("CaemraRegistryListener", "number of services : ${device.services!!.size}")
                 Log.v(
                     "CaemraRegistryListener",
-                    "descriptorURI : ${device?.services!![0].descriptorURI}"
+                    "descriptorURI : ${device.services!![0].descriptorURI}"
                 )
-                Log.v("CaemraRegistryListener", "controlURI : ${device?.services!![0].controlURI}")
+                Log.v("CaemraRegistryListener", "controlURI : ${device.services!![0].controlURI}")
                 Log.v(
                     "CaemraRegistryListener",
-                    "eventsubURI : ${device?.services!![0].eventSubscriptionURI}"
-                )
-                Log.v(
-                    "CaemraRegistryListener",
-                    "nb of actions : ${device?.services!![0].actions.size}"
+                    "eventsubURI : ${device.services!![0].eventSubscriptionURI}"
                 )
                 Log.v(
                     "CaemraRegistryListener",
-                    "nb of state vars : ${device?.services!![0].stateVariables.size}"
+                    "nb of actions : ${device.services!![0].actions.size}"
+                )
+                Log.v(
+                    "CaemraRegistryListener",
+                    "nb of state vars : ${device.services!![0].stateVariables.size}"
                 )
             }
         }
