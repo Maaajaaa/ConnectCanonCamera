@@ -5,15 +5,16 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".ui.main.GalleryFragment">
+
     <GridView
         android:id="@+id/gridView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:columnWidth="160dp"
+        android:columnWidth="120dp"
+        android:horizontalSpacing="3dp"
         android:numColumns="auto_fit"
-        android:verticalSpacing="4dp"
-        android:horizontalSpacing="4dp"
-        android:padding="4dp"
+        android:paddingTop="0dp"
+        android:paddingBottom="0dp"
         android:stretchMode="columnWidth"
-       />
+        android:verticalSpacing="1dp"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

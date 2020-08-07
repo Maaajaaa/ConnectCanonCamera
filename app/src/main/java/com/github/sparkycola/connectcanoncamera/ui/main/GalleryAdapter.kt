@@ -22,7 +22,7 @@ class GalleryAdapter(
             convertView = layoutInflater.inflate(com.github.sparkycola.connectcanoncamera.R.layout.listview_with_text_image, parent, false)
             listViewHolder.textInListView = convertView?.findViewById(com.github.sparkycola.connectcanoncamera.R.id.textView) as TextView
             listViewHolder.imageInListView = convertView.findViewById(com.github.sparkycola.connectcanoncamera.R.id.imageView) as ImageView
-            convertView.setTag(listViewHolder)
+            convertView.tag = listViewHolder
         } else {
             listViewHolder = convertView.tag as ViewHolder
         }
@@ -30,6 +30,8 @@ class GalleryAdapter(
         listViewHolder.textInListView?.text = listStorage[position].description
         listViewHolder.imageInListView?.setImageBitmap(listStorage[position].image)
         listViewHolder.imageInListView?.contentDescription = listStorage[position].description
+        listViewHolder.imageInListView?.maxWidth = listStorage[position].image.width
+        //listViewHolder.imageInListView?.maxHeight = listStorage[position].image.height
 
         return convertView
     }
