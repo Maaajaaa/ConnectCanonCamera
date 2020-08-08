@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 class PageViewModel : ViewModel() {
 
     private val _index = MutableLiveData<Int>()
-    val bitmap = MutableLiveData<Bitmap>()
     val text = MutableLiveData<String>()
     val itemLength = MutableLiveData<Int>()
     val galleryObject = MutableLiveData<GalleryObject>()

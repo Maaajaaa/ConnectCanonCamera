@@ -108,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var iminkHTTPD: IminkHTTPD
     private lateinit var queue: RequestQueue
 
+    private lateinit var errorThrowingScope: CoroutineScope
 
     private val serviceConnection: ServiceConnection = object : ServiceConnection {
 
@@ -184,6 +185,13 @@ class MainActivity : AppCompatActivity() {
         }
         iminkHTTPD = IminkHTTPD(mHandler)
         queue = Volley.newRequestQueue(this)
+
+        val errorHandler = CoroutineExceptionHandler { context, error ->
+            val sw = StringWriter()
+            error.printStackTrace(PrintWriter(sw))
+            Log.e(TAG, "error in coroutine: $sw")
+        }
+        errorThrowingScope = CoroutineScope(errorHandler)
     }
 
     private fun startObjectPullMode() {
@@ -226,7 +234,7 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun objectIDURL(startIndex: Int, maxNum: Int, groupType: Int?=null): String {
+    private fun objectIDURL(startIndex: Int, maxNum: Int, groupType: Int? = null): String {
         return if (groupType == null) {
             URL(
                 cameraBaseURL?.protocol,
@@ -234,7 +242,7 @@ class MainActivity : AppCompatActivity() {
                 IMINK_PORT,
                 cameraControlURI.toString() + "ObjIDList?StartIndex=$startIndex&MaxNum=$maxNum&ObjType=ALL"
             ).toString()
-        }else{
+        } else {
             URL(
                 cameraBaseURL?.protocol,
                 cameraBaseURL?.host,
@@ -248,21 +256,14 @@ class MainActivity : AppCompatActivity() {
         val dbFactory =
             DocumentBuilderFactory.newInstance()
         val dBuilder = dbFactory.newDocumentBuilder()
-        val errorHandler = CoroutineExceptionHandler { context, error ->
-            val sw = StringWriter()
-            error.printStackTrace(PrintWriter(sw))
-            Log.e(TAG, "error in coroutine: $sw")
-        }
-        val scope = CoroutineScope(errorHandler)
-        scope.launch {
+
+        errorThrowingScope.launch {
             //the retrieval is 1-based
             val doc: Document = dBuilder.parse(objectIDURL(1, 1))
             val totalNumber =
                 Integer.valueOf(doc.getElementsByTagName("TotalNum").item(0).textContent)
             val initialObjectID = doc.getElementsByTagName("ObjIDList-1").item(0).textContent
             Log.d(TAG, "Total Number of Elements: $totalNumber")
-            //show first image's thumbnail
-            viewModel.bitmap.postValue(getThumbOfObject(initialObjectID.toInt()))
 
             //initialize cameraObjects
             cameraObjects = mutableMapOf()
@@ -304,31 +305,18 @@ class MainActivity : AppCompatActivity() {
             var orderKey = 0
             cameraObjects.forEach {
                 //get thumb
-                Log.d(TAG, "getting thumb${it.key}")
-                val thumb = getThumbOfObject(it.key)
-                if (thumb != null){
+                Log.d(TAG, "getting header bytes of: ${it.key}")
+                val headerBytes = getHeaderBytesOfObject(it.key)
+                if (headerBytes != null) {
                     Log.d(TAG, "posting thumb${it.key} / orderKey: $orderKey")
-                    //display it
-                    viewModel.galleryObject.postValue(GalleryObject(thumb,"$orderKey", id = orderKey))
-                }else{
+                    //process and displayImage with type as description and order key as ID
+                    extractAndPostThumb(headerBytes, "${it.value[0]}", orderKey)
+                } else {
                     Log.e(TAG, "getting thumb ${it.key} returned null")
                 }
                 orderKey++
             }
         }
-        /*
-        // Add the request to the RequestQueue.
-        val objectListLengthRequest = StringRequest(Request.Method.GET, url.toString(), Response.Listener { response ->
-
-            // Display the first 500 characters of the response string.
-            Log.d(TAG, "object list Response is: $response")
-            //val totalNumber = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(In)//.getElementById("TotalNum").textContent
-            // Log.d(TAG, "Total Number of Elements: $totalNumber")
-
-        }, Response.ErrorListener { error ->
-            Log.d(TAG, "Requesting object list at: $url failed: $error")
-        })*/
-        //queue.add(objectListLengthRequest)
     }
 
     override fun onDestroy() {
@@ -374,7 +362,7 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun getThumbOfObject(objectID: Int): Bitmap? {
+    private fun getHeaderBytesOfObject(objectID: Int): ByteArray? {
         //generate URL
         val thumbUrl = URL(
             cameraBaseURL?.protocol,
@@ -382,78 +370,70 @@ class MainActivity : AppCompatActivity() {
             IMINK_PORT,
             cameraControlURI.toString() + "ObjParsingExifHeaderList?ListNum=1&ObjIDList-1=$objectID"
         )
-        return getThumbFromURL(thumbUrl)
+        return getHeaderBytesFromURL(thumbUrl)
     }
 
-    private fun getThumbFromURL(src: URL): Bitmap? {
-        try {
-            val connection: HttpURLConnection = src
-                .openConnection() as HttpURLConnection
-            connection.doInput = true
-            connection.connect()
-            val input: InputStream = connection.inputStream
-            val ds = ByteArrayDataSource(input, "multipart/mixed")
-            val multipart = MimeMultipart(ds)
-            for (i in 0 until multipart.count) {
-                Log.d(
-                    TAG,
-                    "got part $i with type ${multipart.getBodyPart(i).contentType} and filename ${multipart.getBodyPart(
-                        i
-                    ).fileName}"
-                )
-                if (multipart.getBodyPart(i).contentType == "application/octet-stream ;Object-ID=objid1") {
-                    val bytes = multipart.getBodyPart(i).content as ByteArrayInputStream
-                    val byteArray = bytes.readBytes()
-                    val ffIndexes = ArrayList<Int>()
-                    //Todo: streamline this parsing, many optimisations should be possible
+    private fun getHeaderBytesFromURL(src: URL): ByteArray? {
+        val connection: HttpURLConnection = src
+            .openConnection() as HttpURLConnection
+        connection.doInput = true
+        connection.connect()
+        return connection.inputStream.readBytes()
+    }
+
+    private fun extractAndPostThumb(headerBytes: ByteArray, description: String, imageId: Int) {
+        val ds = ByteArrayDataSource(headerBytes, "multipart/mixed")
+        val multipart = MimeMultipart(ds)
+        for (i in 0 until multipart.count) {
+            if (multipart.getBodyPart(i).contentType == "application/octet-stream ;Object-ID=objid1") {
+                val bytes = multipart.getBodyPart(i).content as ByteArrayInputStream
+                val byteArray = bytes.readBytes()
+                val ffIndexes = ArrayList<Int>()
+                val f9Indexes = ArrayList<Int>()
+                //Todo: streamline this parsing, many optimisations should be possible
+                byteArray.forEachIndexed { index, byte ->
                     //last 8 bytes need to be FF D8 FF DB (something) and FF D9
-                    byteArray.forEachIndexed { index, byte ->
-                        if (index + 8 < byteArray.size - 5 && byte == 0xFF.toByte() && byteArray[index + 1] == 0xD8.toByte() && byteArray[index + 2] == 0xFF.toByte() && byteArray[index + 3] == 0xDB.toByte()) {
-                            ffIndexes.add(index)
-                        }
+                    //find possible jpeg header
+                    //Todo: the possible headers can be found much faster by reading only every 7th byte
+                    if (index + 8 < byteArray.size - 5 && byte == 0xFF.toByte() && byteArray[index + 1] == 0xD8.toByte() && byteArray[index + 2] == 0xFF.toByte() && byteArray[index + 3] == 0xDB.toByte()) {
+                        ffIndexes.add(index)
                     }
-                    ffIndexes.forEach { Log.d(TAG, "ffd8ffdb (jpeg magic number) found at: $it") }
-                    val f9Indexes = ArrayList<Int>()
-                    byteArray.forEachIndexed { index, byte ->
-                        if (index + 1 < byteArray.size && byte == 0xFF.toByte() && byteArray[index + 1] == 0xD9.toByte()) {
-                            f9Indexes.add(index)
-                        }
+                    //Todo: this can be found quicker in reverse, we only need the last
+                    //find possible jpeg file ending
+                    if (index + 1 < byteArray.size && byte == 0xFF.toByte() && byteArray[index + 1] == 0xD9.toByte()) {
+                        f9Indexes.add(index)
                     }
-                    f9Indexes.forEach { Log.d(TAG, "ffd9 (jpeg file end) found at: $it") }
-                    if (f9Indexes.size >= 1 && ffIndexes.size >= 1 && ffIndexes[0] < f9Indexes[0]) {
-                        //Don't forget to include the ff d9 in the end
-                        val parsedImage =
-                            byteArray.sliceArray(IntRange(ffIndexes[0], f9Indexes[0] + 1))
-                        try {
-                            //Todo: fix this to a method that is not deprecated
-                            //debug saving
-                            FileOutputStream(
-                                File(
-                                    Environment.getExternalStoragePublicDirectory(
-                                        Environment.DIRECTORY_DOWNLOADS
-                                    ), "thumb.jpg"
-                                )
-                            ).write(parsedImage)
-                            return BitmapFactory.decodeFile(
-                                File(
-                                    Environment.getExternalStoragePublicDirectory(
-                                        Environment.DIRECTORY_DOWNLOADS
-                                    ), "thumb.jpg"
-                                ).toString()
+                }
+                var parsedImage: ByteArray? = null
+                ffIndexes.forEach {
+                    if (f9Indexes.last() - it + 3 > 0) {
+                        parsedImage =
+                            byteArray.sliceArray(IntRange(it, f9Indexes.last() + 1))
+                        viewModel.galleryObject.postValue(GalleryObject(BitmapFactory.decodeByteArray(parsedImage,0,
+                            parsedImage!!.size),description, imageId))
+                    }
+                }
+                if(parsedImage == null){
+                    Log.w(TAG, "unable to parse headerBytes, saving to Downloads Folder")
+                    ffIndexes.forEach { Log.e(TAG, "ff d8 ff db (jpeg magic number) found at: $it") }
+                    f9Indexes.forEach { Log.e(TAG, "ff d9 (jpeg file end) found at: $it") }
+                    //Todo: fix this to a method that is not deprecated
+                    //saving for debugging of failures without the need to grab the bytes with a network analyzer
+                    try {
+                        FileOutputStream(
+                            File(
+                                Environment.getExternalStoragePublicDirectory(
+                                    Environment.DIRECTORY_DOWNLOADS
+                                ), "ConnectCanonCamera_failedHeaderBytes.dat"
                             )
-                        } catch (e: java.lang.Exception) {
-                            Log.e(TAG, e.message!!)
-                        }
-                    } else {
-                        Log.w(TAG, "Invalid thumbnail")
+                        ).write(headerBytes)
+                    } catch (e: IOException) {
+                        e.printStackTrace()
                     }
                 }
             }
-            return null
-        } catch (e: IOException) {
-            e.printStackTrace()
-            return null
         }
+
     }
 
     class CameraRegistryListener : DefaultRegistryListener() {

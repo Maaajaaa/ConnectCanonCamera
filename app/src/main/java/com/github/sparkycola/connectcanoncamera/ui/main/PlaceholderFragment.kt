@@ -33,11 +33,6 @@ class PlaceholderFragment : Fragment() {
             Log.d("Fragment", "got $it")
             textView.text = it
         })
-
-        pageViewModel.bitmap.observe(this, Observer<Bitmap>{
-            Log.d("Fragment", "got bitmap with ${it.height}x${it.width}px")
-            imageView.setImageBitmap(it)
-        })
     }
 
 
@@ -47,121 +42,6 @@ class PlaceholderFragment : Fragment() {
     ): View? {
         val root = inflater.inflate(R.layout.fragment_main, container, false)
         textView = root.findViewById(R.id.section_label)
-        imageView = root.findViewById(R.id.imageView)
-
-        //just a little test of the library
-        /*val actionSet: IminkActionSet = IminkActionSet(setOf<KnownIminkAction>(
-            KnownIminkAction.GetGPSCaptureTimeList,
-            KnownIminkAction.GetGPSTime))*/
-        //var hasGPSTime = actionSet.contains(KnownAction.GetGPSTime)
-        //var hasSomethingitHasnt = actionSet.contains(KnownAction.GetMovieExtProperty)
-        //Log.d(TAG, "actionset: hasGPSTime:$hasGPSTime but GetMovieProperty is $hasSomethingitHasnt")
-
-        val actionSet: IminkActionSet = IminkActionSet("<?xml version=\"1.0\"?>\n" +
-                "<scpd xmlns=\"urn:schemas-upnp-org:service-1-0\">\n" +
-                " <specVersion>\n" +
-                "  <major>1</major>\n" +
-                "  <minor>0</minor>\n" +
-                " </specVersion>\n" +
-                " <actionList>\n" +
-                "  <action>\n" +
-                "   <name>SetUsecaseStatus</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Set</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">UsecaseStatus</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetObjRecvCapability</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">ObjRecvCapability</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>SetSendObjInfo</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Set</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">SendObjInfo</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>SetMovieExtProperty</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Set</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">MovieExtProperty</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>SetObjData</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Set</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">ObjData</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetResizeProperty</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">ResizeProperty</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetObjProperty</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">ObjProperty</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetMovieExtProperty</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">MovieExtProperty</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetObjCount</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">ObjCount</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetObjIDList</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">ObjIDList</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetThumbDataList</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">ThumbDataList</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetObjData</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">ObjData</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetGPSTime</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">GPSTime</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetGPSCaptureTimeList</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">GPSCaptureTimeList</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetGPSListRecvCapability</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">GPSListRecvCapability</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>SetGPSList</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Set</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">GPSList</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>SetGPSClearList</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Set</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">GPSClearList</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>SetDisconnectStatus</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Set</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">DisconnectStatus</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                "  <action>\n" +
-                "   <name>GetGroupedObjIDList</name>\n" +
-                "   <pnpx:X_actKind xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">Get</pnpx:X_actKind>\n" +
-                "   <pnpx:X_resourceName xmlns:pnpx=\"urn:schemas-canon-com:schema-imink\">GroupedObjIDList</pnpx:X_resourceName>\n" +
-                "  </action>\n" +
-                " </actionList>\n" +
-                "</scpd>")
-        //textView.text = actionSet.toIminkDescriptorXMLString()
         return root
     }
 

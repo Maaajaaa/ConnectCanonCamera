@@ -14,5 +14,6 @@
         android:numColumns="auto_fit"
         android:paddingTop="0dp"
         android:paddingBottom="0dp"
+        android:horizontalSpacing="1dp"
         android:stretchMode="columnWidth"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

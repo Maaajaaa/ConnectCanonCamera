@@ -27,11 +27,6 @@ class GalleryFragment : Fragment() {
         activity?.let{
             pageViewModel = ViewModelProviders.of(it).get(PageViewModel::class.java)
         }
-
-        pageViewModel.bitmap.observe(this, Observer<Bitmap>{
-            Log.d(tag, "got bitmap with ${it.height}x${it.width}px")
-        }
-        )
         pageViewModel.itemLength.observe(this, Observer<Int> {
             val galAdapter = (gridView.adapter as GalleryAdapter)
             Log.d(tag, "got new number of Items: $it")
