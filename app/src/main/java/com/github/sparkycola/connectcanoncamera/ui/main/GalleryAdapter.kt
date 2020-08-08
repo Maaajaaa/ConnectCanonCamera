@@ -11,7 +11,7 @@ import android.widget.TextView
 
 class GalleryAdapter(
     private val layoutInflater: LayoutInflater,
-    private val listStorage: List<GalleryObject>,
+    var listStorage: MutableList<GalleryObject>,
     private val context: Context
 ) :BaseAdapter() {
     override fun getView(position: Int, view: View?, parent: ViewGroup?): View {
@@ -28,10 +28,13 @@ class GalleryAdapter(
         }
 
         listViewHolder.textInListView?.text = listStorage[position].description
-        listViewHolder.imageInListView?.setImageBitmap(listStorage[position].image)
+        if(listStorage[position].image == null){
+            //blank image if bitmap is null
+            listViewHolder.imageInListView?.setImageResource(android.R.color.transparent)
+        }else{
+            listViewHolder.imageInListView?.setImageBitmap(listStorage[position].image)
+        }
         listViewHolder.imageInListView?.contentDescription = listStorage[position].description
-        listViewHolder.imageInListView?.maxWidth = listStorage[position].image.width
-        //listViewHolder.imageInListView?.maxHeight = listStorage[position].image.height
 
         return convertView
     }
@@ -45,10 +48,16 @@ class GalleryAdapter(
     }
 
     override fun getItemId(p0: Int): Long {
-        return listStorage[p0].id
+        return listStorage[p0].id.toLong()
     }
 
     override fun getCount(): Int {
         return listStorage.size
+    }
+
+    fun updateTile(galobj: GalleryObject){
+        listStorage[galobj.id] = galobj
+        //make changes visible
+        this.notifyDataSetChanged()
     }
 }

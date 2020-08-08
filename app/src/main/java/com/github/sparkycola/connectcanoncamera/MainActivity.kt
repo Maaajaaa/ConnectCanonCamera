@@ -19,16 +19,17 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProviders
 import androidx.viewpager.widget.ViewPager
 import com.android.volley.AuthFailureError
-import com.android.volley.Request
 import com.android.volley.RequestQueue
 import com.android.volley.Response
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import com.github.sparkycola.connectcanoncamera.libimink.IminkHTTPD
+import com.github.sparkycola.connectcanoncamera.ui.main.GalleryObject
 import com.github.sparkycola.connectcanoncamera.ui.main.PageViewModel
 import com.github.sparkycola.connectcanoncamera.ui.main.SectionsPagerAdapter
 import com.google.android.material.tabs.TabLayout
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.android.AndroidUpnpService
@@ -113,7 +114,7 @@ class MainActivity : AppCompatActivity() {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
 
             upnpService = service as AndroidUpnpService
-            var cameraConnectService = getCameraConnectService()
+            val cameraConnectService = getCameraConnectService()
 
             // Get ready for future device advertisements
             upnpService!!.registry.addListener(cameraRegistryListener)
@@ -247,7 +248,13 @@ class MainActivity : AppCompatActivity() {
         val dbFactory =
             DocumentBuilderFactory.newInstance()
         val dBuilder = dbFactory.newDocumentBuilder()
-        GlobalScope.launch {
+        val errorHandler = CoroutineExceptionHandler { context, error ->
+            val sw = StringWriter()
+            error.printStackTrace(PrintWriter(sw))
+            Log.e(TAG, "error in coroutine: $sw")
+        }
+        val scope = CoroutineScope(errorHandler)
+        scope.launch {
             //the retrieval is 1-based
             val doc: Document = dBuilder.parse(objectIDURL(1, 1))
             val totalNumber =
@@ -266,9 +273,9 @@ class MainActivity : AppCompatActivity() {
                 // the camera won't bitch if we request too many but still only send 99 per packet (G7X, other cameras could differ but probably not)
                 val url = objectIDURL(cameraObjects.size + 1, totalNumber - cameraObjects.size, 1)
                 val doc: Document = dBuilder.parse(url)
-                //iterate over the items in the retrieved list
+                //iterate over the items in the retrieved list, again it's 1-based so the iteration goes 1 to size + 1 instead of the 0 to size for 0-based
                 for (listID in 1 until doc.getElementsByTagName("ListCount")
-                    .item(0).textContent.toInt()) {
+                    .item(0).textContent.toInt() + 1) {
                     val objectID =
                         doc.getElementsByTagName("ObjIDList-$listID").item(0)?.textContent?.toInt()
                     val objType =
@@ -290,6 +297,23 @@ class MainActivity : AppCompatActivity() {
                         Log.d(TAG, "objectID: $objectID\tobjectType: $objType\tgroupNum: $groupNum")
                     }
                 }
+            }
+            Log.d(TAG, "got ${cameraObjects.size} objects")
+            viewModel.itemLength.postValue(cameraObjects.size)
+            //maps keep the order of objects but don't provide a key that is starting at 0 for the first so we need to track it manually
+            var orderKey = 0
+            cameraObjects.forEach {
+                //get thumb
+                Log.d(TAG, "getting thumb${it.key}")
+                val thumb = getThumbOfObject(it.key)
+                if (thumb != null){
+                    Log.d(TAG, "posting thumb${it.key} / orderKey: $orderKey")
+                    //display it
+                    viewModel.galleryObject.postValue(GalleryObject(thumb,"$orderKey", id = orderKey))
+                }else{
+                    Log.e(TAG, "getting thumb ${it.key} returned null")
+                }
+                orderKey++
             }
         }
         /*
@@ -399,8 +423,9 @@ class MainActivity : AppCompatActivity() {
                     if (f9Indexes.size >= 1 && ffIndexes.size >= 1 && ffIndexes[0] < f9Indexes[0]) {
                         //Don't forget to include the ff d9 in the end
                         val parsedImage =
-                            byteArray.sliceArray(IntRange(ffIndexes[0], f9Indexes[0] + 2))
+                            byteArray.sliceArray(IntRange(ffIndexes[0], f9Indexes[0] + 1))
                         try {
+                            //Todo: fix this to a method that is not deprecated
                             //debug saving
                             FileOutputStream(
                                 File(

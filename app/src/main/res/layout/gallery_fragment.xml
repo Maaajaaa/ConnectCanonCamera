@@ -10,11 +10,9 @@
         android:id="@+id/gridView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:columnWidth="120dp"
-        android:horizontalSpacing="3dp"
+        android:columnWidth="160px"
         android:numColumns="auto_fit"
         android:paddingTop="0dp"
         android:paddingBottom="0dp"
-        android:stretchMode="columnWidth"
-        android:verticalSpacing="1dp"/>
+        android:stretchMode="columnWidth"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

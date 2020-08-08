@@ -24,10 +24,6 @@ class PlaceholderFragment : Fragment() {
     private lateinit var textView: TextView
     private lateinit var imageView: ImageView
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-    }
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         //view model in activity scope
         activity?.let{
