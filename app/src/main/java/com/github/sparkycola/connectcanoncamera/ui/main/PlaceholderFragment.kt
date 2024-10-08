@@ -11,7 +11,7 @@ import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
-import com.github.sparkycola.connectcanoncamera.R
+import com.github.sparkycola.connectcanoncamera.databinding.FragmentMainBinding
 import com.github.sparkycola.connectcanoncamera.libimink.IminkActionSet
 
 
@@ -40,9 +40,9 @@ class PlaceholderFragment : Fragment() {
             inflater: LayoutInflater, container: ViewGroup?,
             savedInstanceState: Bundle?
     ): View? {
-        val root = inflater.inflate(R.layout.fragment_main, container, false)
-        textView = root.findViewById(R.id.section_label)
-        return root
+        val binding: FragmentMainBinding = FragmentMainBinding.inflate(inflater, container, false)
+        textView = binding.sectionLabel
+        return binding.root
     }
 
     companion object {

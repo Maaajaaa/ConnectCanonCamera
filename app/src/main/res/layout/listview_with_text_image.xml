@@ -1,30 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:id="@+id/imageView"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentStart="true"
-        android:src="@drawable/ic_launcher_foreground"
-        android:adjustViewBounds="true"/>
+    <data>
 
-    <TextView
-        android:id="@+id/textView"
+    </data>
+
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignWithParentIfMissing="false"
-        android:layout_below="@+id/imageView"
-        android:layout_alignBaseline="@id/imageView"
-        android:layout_centerInParent="false"
-        android:layout_centerHorizontal="false"
-        android:layout_centerVertical="false"
-        android:layout_marginTop="-20sp"
-        android:gravity="center"
-        android:text="New Text"
-        android:textColor="#EAEAEA"
-        android:textSize="14sp" />
-</RelativeLayout>
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/imageView"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentStart="true"
+            android:src="@drawable/ic_launcher_foreground"
+            android:adjustViewBounds="true" />
+
+        <TextView
+            android:id="@+id/textView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignWithParentIfMissing="false"
+            android:layout_below="@+id/imageView"
+            android:layout_alignBaseline="@id/imageView"
+            android:layout_centerInParent="false"
+            android:layout_centerHorizontal="false"
+            android:layout_centerVertical="false"
+            android:layout_marginTop="-20sp"
+            android:gravity="center"
+            android:text="New Text"
+            android:textColor="#EAEAEA"
+            android:textSize="14sp" />
+    </RelativeLayout>
+</layout>

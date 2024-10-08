@@ -23,6 +23,7 @@ import com.android.volley.RequestQueue
 import com.android.volley.Response
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
+import com.github.sparkycola.connectcanoncamera.databinding.ActivityMainBinding
 import com.github.sparkycola.connectcanoncamera.libimink.IminkHTTPD
 import com.github.sparkycola.connectcanoncamera.ui.main.GalleryObject
 import com.github.sparkycola.connectcanoncamera.ui.main.PageViewModel
@@ -99,6 +100,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraObjects: MutableMap<Int, List<String?>>
     private lateinit var viewModel: PageViewModel
 
+    private lateinit var binding: ActivityMainBinding
+
     private var upnpService: AndroidUpnpService? = null
 
     private val udn: UDN = UDN(UUID.fromString(UDN_STRING))
@@ -157,11 +160,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
         val sectionsPagerAdapter = SectionsPagerAdapter(this, supportFragmentManager)
-        val viewPager: ViewPager = findViewById(R.id.view_pager)
+        val viewPager: ViewPager = binding.viewPager
         viewPager.adapter = sectionsPagerAdapter
-        val tabs: TabLayout = findViewById(R.id.tabs)
+        val tabs: TabLayout = binding.tabs
         tabs.setupWithViewPager(viewPager)
         //(tabs.getChildAt(0) as ViewGroup).getChildAt(1).isEnabled = false
 

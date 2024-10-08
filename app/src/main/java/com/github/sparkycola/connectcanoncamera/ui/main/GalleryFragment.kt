@@ -11,7 +11,7 @@ import android.widget.GridView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
-import com.github.sparkycola.connectcanoncamera.R
+import com.github.sparkycola.connectcanoncamera.databinding.GalleryFragmentBinding
 
 
 /**
@@ -27,13 +27,13 @@ class GalleryFragment : Fragment() {
         activity?.let{
             pageViewModel = ViewModelProviders.of(it).get(PageViewModel::class.java)
         }
-        pageViewModel.itemLength.observe(this, Observer<Int> {
+        pageViewModel.itemLength.observe(viewLifecycleOwner, Observer<Int> {
             val galAdapter = (gridView.adapter as GalleryAdapter)
             Log.d(tag, "got new number of Items: $it")
             galAdapter.listStorage = createListOfEmptyGalleryObjects(it)
             galAdapter.notifyDataSetChanged()
         })
-        pageViewModel.galleryObject.observe(this, Observer<GalleryObject> {
+        pageViewModel.galleryObject.observe(viewLifecycleOwner, Observer<GalleryObject> {
             Log.d(tag, "got new thumbnail object with id${it.id}")
             (gridView.adapter as GalleryAdapter).updateTile(it)
         })
@@ -44,14 +44,14 @@ class GalleryFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        val root =  inflater.inflate(R.layout.gallery_fragment, container, false)
-        gridView = root.findViewById(R.id.gridView)
+        val binding: GalleryFragmentBinding = GalleryFragmentBinding.inflate(inflater, container, false)
+        gridView = binding.gridView
         gridView.adapter = this.context?.let { GalleryAdapter(inflater,createListOfEmptyGalleryObjects(25), it) }
         gridView.onItemClickListener = OnItemClickListener { parent, view, position, id ->
             Log.d(tag, "Position: $position id: $id")
         }
 
-        return root
+        return binding.root
     }
 
     private fun createListOfEmptyGalleryObjects(size: Int): MutableList<GalleryObject>{

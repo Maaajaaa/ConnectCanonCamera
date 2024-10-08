@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.ImageView
 import android.widget.TextView
+import com.github.sparkycola.connectcanoncamera.databinding.ListviewWithTextImageBinding
 
 
 class GalleryAdapter(
@@ -19,9 +20,10 @@ class GalleryAdapter(
         var convertView = view
         if (convertView == null) {
             listViewHolder = ViewHolder()
-            convertView = layoutInflater.inflate(com.github.sparkycola.connectcanoncamera.R.layout.listview_with_text_image, parent, false)
-            listViewHolder.textInListView = convertView?.findViewById(com.github.sparkycola.connectcanoncamera.R.id.textView) as TextView
-            listViewHolder.imageInListView = convertView.findViewById(com.github.sparkycola.connectcanoncamera.R.id.imageView) as ImageView
+            val binding: ListviewWithTextImageBinding = ListviewWithTextImageBinding.inflate(layoutInflater, parent, false)
+            convertView = binding.root
+            listViewHolder.textInListView = binding.textView
+            listViewHolder.imageInListView = binding.imageView
             convertView.tag = listViewHolder
         } else {
             listViewHolder = convertView.tag as ViewHolder
